@@ -3,6 +3,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import cv2
 import random
+import glob
+import os
 
 
 def provide_random_coordinates(background, img):
@@ -14,10 +16,8 @@ def provide_random_coordinates(background, img):
     """
     h_img, w_img, _ = img.shape
     h_background, w_background, _ = background.shape
-
-    y_start = random.randint(h_img, h_background)
-    x_start = random.randint(w_img, w_background)
-
+    y_start = random.randint(h_img, h_background-h_img)
+    x_start = random.randint(w_img, w_background-w_img)
     return x_start, x_start+w_img, y_start, y_start+h_img
 
 
@@ -96,10 +96,12 @@ def resize(img, wanted_width):
     return img
 
 
-def place_image_on_background(img, background):
-
+def place_image_on_background(label, img, background):
+    print(label)
     # Prepare background and image.
     img = swap_black_white(img)
+    # resize image
+    img = resize(img, random.randint(int(img.shape[0]/2), int(img.shape[0]*2)))
     mask = get_img_mask(img)
     background = resize(background, 450)
     background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
@@ -112,12 +114,17 @@ def place_image_on_background(img, background):
 
     # use numpy indexing to place the resized image in the background image
     for c in range(0, 3):
-        background[y_start:y_end, x_start:x_end, c] = (
-                mask * img[:, :, c] + background_alpha * background[y_start:y_end, x_start:x_end, c])
+        background[y_start:y_end, x_start:x_end, c] = \
+            (mask * img[:, :, c] + background_alpha * background[y_start:y_end, x_start:x_end, c])
 
     x, y, width, height = create_bounding_box(mask, x_start, y_start)
-    print(f"Fake labels for YOLO - to be implemented and stored in file X_center:{x}, Y_center:{y}, Width: {width}, "
-          f"Height: {height}")
+    print(f"Fake labels for YOLO - to be implemented and stored in file Label: {label}, X_center:{x}, Y_center:{y}, "
+          f"Width: {width}, Height: {height}")
     return background
 
 
+def place_images_on_background(background):
+    image_tuples = [(cv2.imread(file), os.path.basename(file)[0]) for file in glob.glob("images/*.jpg")]
+    for image, label in image_tuples:
+        background = place_image_on_background(label, image, background)
+    return background
