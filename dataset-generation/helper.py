@@ -5,6 +5,19 @@ import cv2
 import random
 import glob
 import os
+import torch
+
+def overlap(boxes1, boxes2):
+    # top left corners of all combinations
+    lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])  # [N,M,2]
+
+    # bottom right corners of all combinations
+    rb = torch.min(boxes1[:, None, 2:], boxes2[:, 2:])  # [N,M,2]
+
+    # width and hight of overlap area of boxes1 and boxes2.
+    wh = (rb - lt).clamp(min=0)  # [N,M,2]
+    inter = wh[:, :, 0] * wh[:, :, 1]  # [N,M]#
+    return torch.all(inter == 0)
 
 
 def provide_random_coordinates(background, img):
@@ -18,7 +31,7 @@ def provide_random_coordinates(background, img):
     h_background, w_background, _ = background.shape
     y_start = random.randint(h_img, h_background-h_img)
     x_start = random.randint(w_img, w_background-w_img)
-    return x_start, x_start+w_img, y_start, y_start+h_img
+    return [x_start, x_start+w_img, y_start, y_start+h_img]
 
 
 def create_bounding_box(mask, x_start, y_start):
@@ -95,9 +108,7 @@ def resize(img, wanted_width):
     img = cv2.resize(img, (output_height, wanted_width))
     return img
 
-
-def place_image_on_background(label, img, background):
-    print(label)
+def prepare_background_image(img, background):
     # Prepare background and image.
     img = swap_black_white(img)
     # resize image
@@ -107,10 +118,24 @@ def place_image_on_background(label, img, background):
     background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
     img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
     img[:, :, 3] = mask
+    return background, img, mask
+
+
+def place_image_on_background(mask, img, background, co):
+    # # print(label)
+    # # Prepare background and image.
+    # img = swap_black_white(img)
+    # # resize image
+    # img = resize(img, random.randint(int(img.shape[0]/2), int(img.shape[0]*2)))
+    # mask = get_img_mask(img)
+    # background = resize(background, 450)
+    # background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
+    # img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
+    # img[:, :, 3] = mask
     background_alpha = 1.0 - mask
 
     # get placement coordinates
-    x_start, x_end, y_start, y_end = provide_random_coordinates(background, img)
+    x_start, x_end, y_start, y_end = co # provide_random_coordinates(background, img)
 
     # use numpy indexing to place the resized image in the background image
     for c in range(0, 3):
@@ -118,13 +143,6 @@ def place_image_on_background(label, img, background):
             (mask * img[:, :, c] + background_alpha * background[y_start:y_end, x_start:x_end, c])
 
     x, y, width, height = create_bounding_box(mask, x_start, y_start)
-    print(f"Fake labels for YOLO - to be implemented and stored in file Label: {label}, X_center:{x}, Y_center:{y}, "
-          f"Width: {width}, Height: {height}")
-    return background
-
-
-def place_images_on_background(background):
-    image_tuples = [(cv2.imread(file), os.path.basename(file)[0]) for file in glob.glob("images/*.jpg")]
-    for image, label in image_tuples:
-        background = place_image_on_background(label, image, background)
-    return background
+    # print(f"Fake labels for YOLO - to be implemented and stored in file Label: {label}, X_center:{x}, Y_center:{y}, "
+    #       f"Width: {width}, Height: {height}")
+    return background, x, y, width, height
