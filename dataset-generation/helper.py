@@ -7,17 +7,27 @@ import glob
 import os
 
 
-def provide_random_coordinates(background, img):
+def provide_coordinates(background, img, placed_images):
     """ Provides random coordinates for placement of image.
 
     :param background: Background image.
     :param img: Image to be placed.
+    :param placed_images: Already present image coordinates. Form [x_start, x_end, y_start, y_end]
     :return: Random x and y coordinates.
     """
-    h_img, w_img, _ = img.shape
-    h_background, w_background, _ = background.shape
-    y_start = random.randint(h_img, h_background-h_img)
-    x_start = random.randint(w_img, w_background-w_img)
+    not_found = True
+    while not_found:
+        h_img, w_img, _ = img.shape
+        h_background, w_background, _ = background.shape
+        y_start = random.randint(h_img, h_background-h_img)
+        x_start = random.randint(w_img, w_background-w_img)
+        track_bools = np.zeros(len(placed_images))
+        for i, placed_image in enumerate(placed_images):
+            if (x_start>=placed_image[1]) or (x_start+w_img<=placed_image[0]) or (y_start>=placed_image[3]) or (
+                    y_start+h_img<=placed_image[2]):
+                track_bools[i] = 1
+        if np.all(track_bools==1):
+            not_found = False
     return x_start, x_start+w_img, y_start, y_start+h_img
 
 
@@ -84,7 +94,7 @@ def swap_black_white(img):
 
 
 def resize(img, wanted_width):
-    """ Resizes background while keeping dimensions
+    """ Resizes image while keeping dimensions
 
     :param img: Input image.
     :param wanted_width: Desired size of horizontal axis.
@@ -96,12 +106,11 @@ def resize(img, wanted_width):
     return img
 
 
-def place_image_on_background(label, img, background):
-    print(label)
+def place_image_on_background(label, img, background, placed_images):
     # Prepare background and image.
     img = swap_black_white(img)
     # resize image
-    img = resize(img, random.randint(int(img.shape[0]/2), int(img.shape[0]*2)))
+    img = resize(img, random.randint(int(img.shape[0]/1.3), int(img.shape[0]*1.3)))
     mask = get_img_mask(img)
     background = resize(background, 450)
     background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
@@ -110,21 +119,30 @@ def place_image_on_background(label, img, background):
     background_alpha = 1.0 - mask
 
     # get placement coordinates
-    x_start, x_end, y_start, y_end = provide_random_coordinates(background, img)
-
+    x_start, x_end, y_start, y_end = provide_coordinates(background, img, placed_images)
+    placed_images.append([x_start, x_end, y_start, y_end])
     # use numpy indexing to place the resized image in the background image
     for c in range(0, 3):
         background[y_start:y_end, x_start:x_end, c] = \
             (mask * img[:, :, c] + background_alpha * background[y_start:y_end, x_start:x_end, c])
 
     x, y, width, height = create_bounding_box(mask, x_start, y_start)
-    print(f"Fake labels for YOLO - to be implemented and stored in file Label: {label}, X_center:{x}, Y_center:{y}, "
-          f"Width: {width}, Height: {height}")
+    #print(f"Fake labels for YOLO - to be implemented and stored in file Label: {label}, X_center:{x}, Y_center:{y}, "
+    #      f"Width: {width}, Height: {height}")
     return background
 
 
-def place_images_on_background(background):
-    image_tuples = [(cv2.imread(file), os.path.basename(file)[0]) for file in glob.glob("images/*.jpg")]
+def place_images_on_background():
+    image_tuples = []
+    for i in range(30):
+        random_folder = random.choice(glob.glob(os.path.join("symbol_images", "*")))
+        random_img = random.choice(os.listdir(random_folder))
+        image_tuples.append([cv2.imread(random_folder+"/"+random_img), random_folder[-1]])
+    random_background = random.choice(os.listdir("blackboard_images"))
+    background = cv2.imread("blackboard_images/"+random_background)
+    placed_images = []
     for image, label in image_tuples:
-        background = place_image_on_background(label, image, background)
+        background = place_image_on_background(label, image, background, placed_images)
     return background
+
+place_images_on_background()
