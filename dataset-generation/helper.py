@@ -3,9 +3,8 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 import cv2
 import random
-import glob
-import os
 import torch
+
 
 def overlap(boxes1, boxes2):
     # top left corners of all combinations
@@ -29,9 +28,9 @@ def provide_random_coordinates(background, img):
     """
     h_img, w_img, _ = img.shape
     h_background, w_background, _ = background.shape
-    y_start = random.randint(h_img, h_background-h_img)
-    x_start = random.randint(w_img, w_background-w_img)
-    return [x_start, x_start+w_img, y_start, y_start+h_img]
+    y_start = random.randint(0, h_background-h_img)
+    x_start = random.randint(0, w_background-w_img)
+    return [x_start, y_start, x_start+w_img, y_start+h_img]
 
 
 def create_bounding_box(mask, x_start, y_start):
@@ -48,17 +47,18 @@ def create_bounding_box(mask, x_start, y_start):
     bbox = [np.min(nz[0]), np.min(nz[1]), np.max(nz[0]), np.max(nz[1])]
 
     # Compute anchor points in Background image
-    x = bbox[1] + x_start
-    y = bbox[0] + y_start
-    width = bbox[3] - bbox[1]
-    height = bbox[2] - bbox[0]
+    x = bbox[1] + x_start - 5
+    y = bbox[0] + y_start - 5 
+    width = bbox[3] - bbox[1] + 5
+    height = bbox[2] - bbox[0] + 5
 
     # draw bbox on the image
-    plt.gca().add_patch(Rectangle((x, y), width, height, linewidth=1, edgecolor='r', facecolor='none'))
-    return int(x + width / 2 + height / 2), int(y + width / 2 + height / 2), width, height
+    # plt.gca().add_patch(Rectangle((x, y), width, height,
+    #                               linewidth=1, edgecolor='r', facecolor='none'))
+    return x, y, x + width, y + height
 
 
-def create_label(file, x, y, width, height):
+def create_label_object(x, y, width, height, label):
     """ Creates label for YOLO algorithm
 
     :param file:
@@ -68,7 +68,13 @@ def create_label(file, x, y, width, height):
     :param height:
     :return:
     """
-    pass
+    label_txt = ''
+    label_txt += str(x) + ','  # x1
+    label_txt += str(y) + ','  # y1
+    label_txt += str(width) + ','  # x2
+    label_txt += str(height) + ','  # y2
+    label_txt += str(label) + ' '
+    return label_txt
 
 
 def get_img_mask(img):
@@ -90,9 +96,10 @@ def swap_black_white(img):
     :param img: Input image.
     :return: Image with swapper color channels.
     """
-    img[img <= 5] = 240
-    img[img > 240] = 0
-    img[img == 240] = 255
+    img[img < 128] = 0
+    img[img >= 128] = 255
+    img = cv2.bitwise_not(img)
+    img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
     return img
 
 
@@ -108,41 +115,40 @@ def resize(img, wanted_width):
     img = cv2.resize(img, (output_height, wanted_width))
     return img
 
-def prepare_background_image(img, background):
-    # Prepare background and image.
-    img = swap_black_white(img)
-    # resize image
-    img = resize(img, random.randint(int(img.shape[0]/2), int(img.shape[0]*2)))
-    mask = get_img_mask(img)
-    background = resize(background, 450)
+
+def place_image_on_background(label, image, background, coordinates, i):
+    # Prepare and resize background
     background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
-    img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
+    background = resize(background, 450)
+
+    # Prepare image.
+    image = swap_black_white(image)
+
+    # resize and find coordinates
+    img = resize(image, random.randint(
+        int(image.shape[0]/2), int(image.shape[0]*1.3)))
+    co = torch.tensor(provide_random_coordinates(
+        background, img)).reshape((1, 4))
+    while not overlap(co, coordinates):
+        img = resize(image, random.randint(
+            int(image.shape[0]/2), int(image.shape[0]*1.3)))
+        co = torch.tensor(provide_random_coordinates(
+            background, img)).reshape((1, 4))
+    coordinates[i] = co
+
+    mask = get_img_mask(img)
     img[:, :, 3] = mask
-    return background, img, mask
-
-
-def place_image_on_background(mask, img, background, co):
-    # # print(label)
-    # # Prepare background and image.
-    # img = swap_black_white(img)
-    # # resize image
-    # img = resize(img, random.randint(int(img.shape[0]/2), int(img.shape[0]*2)))
-    # mask = get_img_mask(img)
-    # background = resize(background, 450)
-    # background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
-    # img = cv2.cvtColor(img, cv2.COLOR_RGB2RGBA)
-    # img[:, :, 3] = mask
     background_alpha = 1.0 - mask
 
     # get placement coordinates
-    x_start, x_end, y_start, y_end = co # provide_random_coordinates(background, img)
+    x_start, y_start, x_end, y_end = co[0].tolist()
 
     # use numpy indexing to place the resized image in the background image
     for c in range(0, 3):
         background[y_start:y_end, x_start:x_end, c] = \
-            (mask * img[:, :, c] + background_alpha * background[y_start:y_end, x_start:x_end, c])
+            (mask * img[:, :, c] + background_alpha *
+             background[y_start:y_end, x_start:x_end, c])
 
-    x, y, width, height = create_bounding_box(mask, x_start, y_start)
-    # print(f"Fake labels for YOLO - to be implemented and stored in file Label: {label}, X_center:{x}, Y_center:{y}, "
-    #       f"Width: {width}, Height: {height}")
-    return background, x, y, width, height
+    x1, y1, x2, y2 = create_bounding_box(mask, x_start, y_start)
+    label_text = create_label_object(x1, y1, x2, y2, label)
+    return background, label_text
