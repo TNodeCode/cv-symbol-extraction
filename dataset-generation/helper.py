@@ -115,6 +115,14 @@ def resize(img, wanted_width):
     img = cv2.resize(img, (output_height, wanted_width))
     return img
 
+def random_color(image):
+    h, w, _ = image.shape
+    color = np.zeros((h, w, 3))
+    color[:, : , 0] += random.randint(0, 255)
+    color[:, : , 1] += random.randint(0, 255)
+    color[:, : , 2] += random.randint(0, 255)
+    image[:, :, :3] = color
+    return image
 
 def place_image_on_background(label, image, background, coordinates, i):
     # Prepare and resize background
@@ -138,6 +146,7 @@ def place_image_on_background(label, image, background, coordinates, i):
 
     mask = get_img_mask(img)
     img[:, :, 3] = mask
+    img = random_color(img)
     background_alpha = 1.0 - mask
 
     # get placement coordinates

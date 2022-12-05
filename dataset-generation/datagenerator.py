@@ -7,17 +7,13 @@ import torch
 import sys
 
 
-def create_dataset():
-    args = sys.argv[1:]
-    dataset_num = int(args[0])
-    img_num= int(args[1])
-
+def create_dataset(dataset_num, img_num):
     dataset_path = "archive\\dataset1000\\"
     if not os.path.exists(dataset_path):
         os.mkdir(dataset_path)
 
     images_path = "archive\\extracted_images\\"
-    background_path = "archive\\background_images\\blackboard\\*"
+    background_path = "archive\\background_images\\*"
     labels = os.listdir(images_path)
     backgrounds = [cv2.imread(file) for file in glob.glob(background_path)]
     images = {}
@@ -28,7 +24,7 @@ def create_dataset():
     filename = 0
     label_txt = open(dataset_path + "label.txt", 'a')
 
-    while len(os.listdir(dataset_path))-1 <= dataset_num:
+    while filename < dataset_num:
         for back in backgrounds:
             coordinates = torch.zeros((img_num, 4))
             label_txt.write(os.getcwd() + '\\' +
@@ -50,11 +46,17 @@ def create_dataset():
 
             cv2.imwrite(dataset_path + str(filename) + ".jpg", background)
             filename += 1
-            if len(os.listdir(dataset_path))-1 >= dataset_num:
+            if filename >= dataset_num:
                 break
 
     label_txt.close()
 
+def main():
+    args = sys.argv[1:]
+    dataset_num = int(args[0])
+    img_num= int(args[1])
+    create_dataset(dataset_num, img_num)
+
 
 if __name__ == "__main__":
-    create_dataset()
+    main()
