@@ -28,8 +28,8 @@ def provide_random_coordinates(background, img):
     """
     h_img, w_img, _ = img.shape
     h_background, w_background, _ = background.shape
-    y_start = random.randint(0, h_background-h_img)
-    x_start = random.randint(0, w_background-w_img)
+    y_start = random.randint(5, h_background-h_img-5)
+    x_start = random.randint(5, w_background-w_img-5)
     return [x_start, y_start, x_start+w_img, y_start+h_img]
 
 
