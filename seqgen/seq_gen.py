@@ -1,5 +1,8 @@
+import torch
 import random as r
 import json
+from seqgen.vocabulary import *
+from seqgen.preprocess import *
 
 digits_in = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 digits_out = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
@@ -17,7 +20,7 @@ tmpl_out = ["\\sum", "\\limits", "_",
             "{", "LETTER", "=", "DIGIT", "}", "^", "LETTER"]
 
 
-def generate_random_sequence(in_voc: list, out_voc: list, continue_prob=0.9, max_length=20):
+def generate_random_sequence(in_voc: list, out_voc: list, continue_prob=0.9, max_length=20, padding=True):
     """
     Generate a random training sample for a sequence-to-sequence model
 
@@ -29,8 +32,8 @@ def generate_random_sequence(in_voc: list, out_voc: list, continue_prob=0.9, max
     """
     assert len(in_voc) == len(
         out_voc), "Input and output vocabluary must be of the same size"
-    seq_in = []
-    seq_out = []
+    seq_in = [['<start>', 0, 0, 0, 0]]
+    seq_out = ['<start>']
 
     # This is the position of the upper left corner of the current token
     x0, y0 = (100, 100)
@@ -53,8 +56,14 @@ def generate_random_sequence(in_voc: list, out_voc: list, continue_prob=0.9, max
         x0 = x0 + 1.1 * box_width
 
         # Check if the sequence should be continued
-        if r.random() > continue_prob or len(seq_in) >= max_length:
+        if r.random() > continue_prob or len(seq_in) >= (max_length - 1):
             break
+
+    # Pad sequence with zeros
+    if padding:
+        for i in range(max_length - len(seq_in)):
+            seq_in.append(['<end>', 0, 0, 0, 0])
+            seq_out.append('<end>')
 
     return seq_in, seq_out
 
@@ -82,7 +91,7 @@ def save_as_json(samples, filename="samples.json"):
         json.dump(samples, fp, indent=2)
 
 
-def generator(num_samples=5):
+def generator(num_samples=5, max_length=10):
     """
     Generate synthetic training samples for a sequence-to-sequence model.
     A training sample consists of an input sequence (feature sequence) and the desired output sequence (target sequence).
@@ -92,13 +101,24 @@ def generator(num_samples=5):
     Parameters:
     num_samples: Number of training samples that will be created
     """
-    samples = []
+    inputs, outputs = [], []
     for i in range(num_samples):
         feature_seq, target_seq = generate_random_sequence(
             in_voc=digits_in+operators_in,
             out_voc=digits_out+operators_out,
             continue_prob=0.95,
-            max_length=10
+            max_length=max_length
         )
-        samples.append({"feature_seq": feature_seq, "target_seq": target_seq})
-    return samples
+        inputs.append(feature_seq)
+        outputs.append(target_seq)
+    return inputs, outputs
+
+
+def generate_synthetic_training_data(num_samples=16, max_length=10, device='cpu'):
+    vocab_in = Vocabulary(vocab_filename="seqgen/vocab_in.txt")
+    vocab_out = Vocabulary(vocab_filename="seqgen/vocab_out.txt")
+    features, targets = generator(num_samples, max_length=max_length)
+    features = encode_classes_of_bboxes(features, vocab_in)
+    features = normalize_coordinates(features)
+    targets = encode_latex_tokens(targets, vocab_out)
+    return torch.tensor(features).to(device), torch.tensor(targets).to(device)
