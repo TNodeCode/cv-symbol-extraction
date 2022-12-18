@@ -42,7 +42,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     loss = 0
 
     for i in range(input_length):
-        print("I-TH TOKEN", i, input_tensor[i])
+        print("I-TH TOKEN", i, input_tensor[:, i])
         # Pass input tensor through encoder -> get output tensor and hidden state tensor
         encoder_output, encoder_hidden = encoder(
             input_tensor[i], encoder_hidden)
@@ -59,21 +59,21 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
 
     if use_teacher_forcing:
         # Teacher forcing: Feed the target as the next input
-        for di in range(target_length):
+        for i in range(target_length):
             decoder_output, decoder_hidden = decoder(
                 decoder_input, decoder_hidden, encoder_outputs)
-            loss += criterion(decoder_output, target_tensor[di])
-            decoder_input = target_tensor[di]  # Teacher forcing
+            loss += criterion(decoder_output, target_tensor[i])
+            decoder_input = target_tensor[i]  # Teacher forcing
 
     else:
         # Without teacher forcing: use its own predictions as the next input
-        for di in range(target_length):
+        for i in range(target_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
                 decoder_input, decoder_hidden, encoder_outputs)
             topv, topi = decoder_output.topk(1)
             decoder_input = topi.squeeze().detach()  # detach from history as input
 
-            loss += criterion(decoder_output, target_tensor[di])
+            loss += criterion(decoder_output, target_tensor[i])
             if decoder_input.item() == EOS_token:
                 break
 
