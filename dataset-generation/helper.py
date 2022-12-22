@@ -161,3 +161,68 @@ def place_image_on_background(label, image, background, coordinates, i):
     x1, y1, x2, y2 = create_bounding_box(mask, x_start, y_start)
     label_text = create_label_object(x1, y1, x2, y2, label)
     return background, label_text
+
+def place_images_on_grid_background2(labels, images, background):
+    # Prepare and resize background
+    background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
+    background = resize(background, 450)
+
+
+    dims_x = int(images[0].shape[0]*1.3) # minimum width of grid cell cause of img shape
+    dims_y = int(images[0].shape[1]*1.3) # minimum height of grid cell cause of img shape
+    # Get grid depending on background image
+    grid = random.randint(1, int(background.shape[0] / dims_x)), \
+           random.randint(1, int(background.shape[1] / dims_y))
+
+    dims_x = int(background.shape[0] / grid[0]) # resize to new dimensions
+    dims_y = int(background.shape[1] / grid[1])
+
+    for i in range(grid[0]):
+        for j in range(grid[1]):
+            rand_int = random.randint(0, len(images)-1)
+            image = swap_black_white(images[rand_int])
+            # resize and find coordinates
+            img = resize(image, random.randint(
+                int(image.shape[0]/2), int(image.shape[0]*1.3)))
+            co = [i * dims_x, j * dims_y, (i * dims_x + img.shape[0]),
+                  (j * dims_y + img.shape[1])]
+            co = torch.tensor(co).reshape((1, 4))
+
+            mask = get_img_mask(img)
+            img[:, :, 3] = mask
+            img = random_color(img)
+            background_alpha = 1.0 - mask
+
+            # get placement coordinates
+            x_start, y_start, x_end, y_end = co[0].tolist()
+
+            # use numpy indexing to place the resized image in the background image
+            for c in range(0, 3):
+                background[x_start:x_end, y_start:y_end, c] = \
+                    (mask * img[:, :, c] + background_alpha *
+                     background[x_start:x_end, y_start:y_end, c])
+
+            x1, y1, x2, y2 = create_bounding_box(mask, x_start, y_start)
+            label_text = create_label_object(x1, y1, x2, y2, labels[rand_int])
+    return background, label_text
+
+
+def place_images_on_grid_background(labels, images, background):
+    # Prepare and resize background
+    background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
+    background = resize(background, 450)
+
+    max_line_height = int(images[0].shape[1] * 1.3)
+
+    # Get max amount of lines
+    max_lines = int(background.shape[0] / max_line_height)
+
+    # Place images on line
+    for i in range(max_lines):
+        image = swap_black_white(images[i])
+
+        # get bounding box of image
+
+
+
+
