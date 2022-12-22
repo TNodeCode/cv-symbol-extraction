@@ -214,12 +214,14 @@ if __name__ == '__main__':
         
         folder_name = sys.argv[1].split(os.sep)[-2]
 
-        save_path = "data_png_" + folder_name if len(sys.argv) < 5 else sys.argv[4]+"data_png_" #+ folder_name
+        # save_path = "data_png_" + folder_name if len(sys.argv) < 5 else sys.argv[4] + "data_png_" #+ folder_name
+        save_path = "equationDataset"
 
         # save labels path
-        save_path_labels = "data_labels_" + folder_name if len(sys.argv) < 5 else sys.argv[4]+"data_labels_" #+ folder_name
-        if not os.path.exists(save_path_labels):
-            os.makedirs(save_path_labels)
+        save_path_labels = save_path
+        # save_path_labels = "data_labels_" + folder_name if len(sys.argv) < 5 else sys.argv[4]+"data_labels_" #+ folder_name
+        # if not os.path.exists(save_path_labels):
+        #     os.makedirs(save_path_labels)
 
         print("to : " + save_path)
         if not os.path.isdir(save_path):
@@ -232,6 +234,9 @@ if __name__ == '__main__':
         print("Starting inkml to png conversion on {} file{}\n".format(
             len(FILES), "s" if len(FILES) > 1 else ""
             ))
+        
+        # Create label txt file
+        label_txt = open(save_path_labels + os.sep + 'label' + ".txt", "a")
 
         for idx, file in enumerate(FILES):
 
@@ -274,18 +279,17 @@ if __name__ == '__main__':
                 else:
                     lg_dict[i] = symbol
 
-            # Create label txt file
-            label_txt = open(save_path_labels + os.sep + img_basename + ".txt", "w")
-            label_txt.write(save_path + os.sep + img_basename + ".png")
-
             traces = parse_inkml(img_path + os.sep + img_name)
 
             selected_tr = get_traces_data(traces)
             im, label_lines = convert_to_imgs(selected_tr, dim, lg_dict)
 
+            # initialize img file name
+            label_txt.write(save_path + os.sep + img_basename + ".png")
+
             # 2d array to string with comma between each element and space between arrays
             label_txt.write(" " + " ".join([",".join([str(x) for x in line]) for line in label_lines]))
-            label_txt.close()
+            label_txt.write('\n')
 
             if padding > 0:
                 im = np.lib.pad(im, (padding, padding), 'constant', constant_values=255)
@@ -295,5 +299,8 @@ if __name__ == '__main__':
             imsave(save_path + os.sep + img_basename + '.png',im)
 
             print("\t\t\rfile: {:>10} | {:>6}/{:}".format(img_basename, idx+1, len(FILES)), end="")
+
+        # Close label_txt file
+        label_txt.close()
 
     print("\n\nFinished")

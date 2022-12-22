@@ -47,15 +47,15 @@ def create_bounding_box(mask, x_start, y_start):
     bbox = [np.min(nz[0]), np.min(nz[1]), np.max(nz[0]), np.max(nz[1])]
 
     # Compute anchor points in Background image
-    x = bbox[1] + x_start - 5
-    y = bbox[0] + y_start - 5 
-    width = bbox[3] - bbox[1] + 5
-    height = bbox[2] - bbox[0] + 5
+    x1 = bbox[1] + x_start - 1
+    y1 = bbox[0] + y_start - 1
+    x2 = bbox[3] + x_start + 1
+    y2 = bbox[2] + y_start + 1
 
-    # draw bbox on the image
-    # plt.gca().add_patch(Rectangle((x, y), width, height,
+    # # draw bbox on the image
+    # plt.gca().add_patch(Rectangle((x1, y1), x2-x1, y2-y1,
     #                               linewidth=1, edgecolor='r', facecolor='none'))
-    return x, y, x + width, y + height
+    return x1, y1, x2, y2
 
 
 def create_label_object(x, y, width, height, label):
@@ -76,6 +76,24 @@ def create_label_object(x, y, width, height, label):
     label_txt += str(label) + ' '
     return label_txt
 
+def create_label_objects(x1_start, y1_start, labels, min_y, scale):
+    label_txt = ''
+    for bbox in labels:
+        x1 = int(int(bbox[0]) * scale) + x1_start
+        y1 = int((int(bbox[1]) - min_y) * scale) + y1_start
+        x2 = int(int(bbox[2]) * scale) + x1_start + 2
+        y2 = int((int(bbox[3]) - min_y) * scale) + y1_start + 2
+        label = bbox[4]
+        # plt.gca().add_patch(Rectangle((x1, y1), x2-x1, y2-y1, linewidth=1, edgecolor='r', facecolor='none'))
+        
+        label_txt += str(x1) + ','     # x1
+        label_txt += str(y1) + ','               # y1
+        label_txt += str(x2) + ','     # x2
+        label_txt += str(y2) + ','               # y2
+        label_txt += str(label) + ' '
+    return label_txt
+
+
 
 def get_img_mask(img):
     """ Creates mask of given image. A mask will allow us to focus on the specific portion of the input image,
@@ -85,6 +103,17 @@ def get_img_mask(img):
     :return: Mask of image.
     """
     mask = img.copy()[:, :, 0]
+    mask[mask > 0] = 1
+    return mask
+
+def get_formulars_mask(formulas):
+    """ Creates mask of given formula image. A mask will allow us to focus on the specific portion of the input formula image,
+    in our case - a formula.
+
+    :param formula: Input formula image.
+    :return: Mask of image.
+    """
+    mask = np.copy(formulas)[:, :, :, 0]
     mask[mask > 0] = 1
     return mask
 
@@ -113,7 +142,7 @@ def resize(img, wanted_width):
     scale = wanted_width / img.shape[0]
     output_height = int(img.shape[1] * scale)
     img = cv2.resize(img, (output_height, wanted_width))
-    return img
+    return img, scale
 
 def random_color(image):
     h, w, _ = image.shape
@@ -127,19 +156,27 @@ def random_color(image):
 def place_image_on_background(label, image, background, coordinates, i):
     # Prepare and resize background
     background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
-    background = resize(background, 450)
+    background, _ = resize(background, 700)
 
     # Prepare image.
     image = swap_black_white(image)
+    mask = get_img_mask(image)
+    nz = np.nonzero(mask)
+    min_y = np.min(nz[0])
+    max_y = np.max(nz[0])
+    image = image[min_y:max_y]
+    img = image
+    scale = 1
+
 
     # resize and find coordinates
-    img = resize(image, random.randint(
-        int(image.shape[0]/2), int(image.shape[0]*1.3)))
+    # rand_int = random.randint(int(image.shape[0]/2), int(image.shape[0]*1.3))
+    # img, scale = resize(image, rand_int)
     co = torch.tensor(provide_random_coordinates(
         background, img)).reshape((1, 4))
     while not overlap(co, coordinates):
-        img = resize(image, random.randint(
-            int(image.shape[0]/2), int(image.shape[0]*1.3)))
+        # rand_int = random.randint(int(image.shape[0]/2), int(image.shape[0]*1.3))
+        # img, scale = resize(image, rand_int)
         co = torch.tensor(provide_random_coordinates(
             background, img)).reshape((1, 4))
     coordinates[i] = co
@@ -158,10 +195,23 @@ def place_image_on_background(label, image, background, coordinates, i):
             (mask * img[:, :, c] + background_alpha *
              background[y_start:y_end, x_start:x_end, c])
 
-    x1, y1, x2, y2 = create_bounding_box(mask, x_start, y_start)
-    label_text = create_label_object(x1, y1, x2, y2, label)
+    x1_start, y1_start, _, _ = create_bounding_box(mask, x_start, y_start)
+    label_text = create_label_objects(x1_start, y1_start, label, min_y, scale)
+    # plt.imshow(background)
+    # plt.show()
     return background, label_text
 
+
+
+
+
+
+
+
+
+
+
+###################################################################
 def place_images_on_grid_background2(labels, images, background):
     # Prepare and resize background
     background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
