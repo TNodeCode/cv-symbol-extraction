@@ -212,7 +212,7 @@ if __name__ == '__main__':
         folder_name = sys.argv[1].split(os.sep)[-2]
 
         # save_path = "data_png_" + folder_name if len(sys.argv) < 5 else sys.argv[4] + "data_png_" #+ folder_name
-        save_path = "archive" + os.sep + "formulas2"
+        save_path = "archive" + os.sep + "formulas"
 
         # save labels path
         save_path_labels = save_path
