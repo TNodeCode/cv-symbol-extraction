@@ -1,12 +1,9 @@
-import sys, os, argparse
+import sys, os
 import xml.etree.ElementTree as ET
 import numpy as np
+from skimage.io import imsave
 from skimage.draw import line
-from skimage.io import imread, imsave
 import scipy.ndimage as ndimage
-import pickle
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 
 import warnings
 warnings.filterwarnings('ignore')
@@ -85,7 +82,7 @@ def draw_pattern(traces,pattern_drawn, box_axis_size):
                 # Draw line between the two endpoints of the trace
                 linesX = linesY = []
                 oneLineX, oneLineY = line(r0=traces[pt_idx][1], c0=traces[pt_idx][0],
-                                   r1=traces[pt_idx + 1][1], c1=traces[pt_idx + 1][0])
+                                              r1=traces[pt_idx + 1][1], c1=traces[pt_idx + 1][0])
 
                 linesX = np.concatenate(
                     [oneLineX, oneLineX, oneLineX+1]) # We can use this to draw a thicker line
@@ -215,7 +212,7 @@ if __name__ == '__main__':
         folder_name = sys.argv[1].split(os.sep)[-2]
 
         # save_path = "data_png_" + folder_name if len(sys.argv) < 5 else sys.argv[4] + "data_png_" #+ folder_name
-        save_path = "archive\\formulas"
+        save_path = "archive" + os.sep + "formulas2"
 
         # save labels path
         save_path_labels = save_path
@@ -255,34 +252,64 @@ if __name__ == '__main__':
                 print("\n\nLG file not found:\n\t{}".format(lg_file))
                 exit()
 
-            # Read everything from lg file between #Nodes: and #Edges:
             with open(lg_file, 'r') as f:
-                copy = False
-                LG = []
-                while fileLine := f.readline().rstrip():
-                    if fileLine.startswith("# Edges:"):
-                        break
-                    if copy:
-                        LG.append(fileLine.split(","))
-                    if fileLine.startswith("# Nodes:"):
-                        copy = True
+                # Read all lines in the file
+                lines = f.readlines()
+            # Read everything from lg file between #Nodes: and #Edges:
+            copy_nodes = False
+            copy_edges = False
+            LG_Nodes = []
+            LG_Edges = []
+            for file_line in lines:
+                # Remove leading and trailing whitespace from the line
+                file_line = file_line.strip()
+                # Skip empty lines
+                if not file_line:
+                    continue
+                if copy_edges:
+                    my_line = file_line.split(",")
+                    my_line = [s.replace(" ", "") for s in my_line]
+                    if my_line[3] == "*":  # if the stroke is of the same character
+                        LG_Edges.append([my_line[1], my_line[2]])
+                if file_line.startswith("# Edges:"):
+                    copy_nodes = False
+                    copy_edges = True
+                if copy_nodes:
+                    LG_Nodes.append(file_line)
+                if file_line.startswith("# Nodes:"):
+                    copy_nodes = True
 
             # Get symbol from LG list in dict with key = stroke num (where it was last executed)
-            lg_dict = {}
-            for i, lg in enumerate(LG):
-                symbol = lg[2]
-                if i < len(LG) - 1:
-                    if LG[i+1][2] == symbol:
-                        lg_dict[i] = "save"
-                    else:
-                        lg_dict[i] = symbol
+            lg_node_dict = {}
+            lg_edge_dict = {}
+            for edge_line in LG_Edges:
+                prev_stroke, next_stroke = edge_line[0], edge_line[1] # sa
+                if prev_stroke in lg_edge_dict:
+                    lg_edge_dict[prev_stroke].append(next_stroke)
                 else:
-                    lg_dict[i] = symbol
+                    lg_edge_dict[prev_stroke] = [next_stroke]
+
+            for i, lg in enumerate(LG_Nodes):
+                symbol = lg.split(",")[2].replace(" ", "")
+                stroke_num = lg.split(",")[1].replace(" ", "")
+                if i < len(LG_Nodes) - 1:
+                    # if next symbol is the same (also check strokes via edge_dict)
+                    next_ = LG_Nodes[i + 1].split(",")[2].replace(" ", "")
+                    if next_ == symbol and stroke_num in lg_edge_dict:
+                        if LG_Nodes[i + 1].split(",")[1].replace(" ", "") in lg_edge_dict[stroke_num]:
+                            # mark as same symbol
+                            lg_node_dict[i] = "save"
+                        else:
+                            lg_node_dict[i] = symbol
+                    else:
+                        lg_node_dict[i] = symbol
+                else:
+                    lg_node_dict[i] = symbol
 
             traces = parse_inkml(img_path + os.sep + img_name)
 
             selected_tr = get_traces_data(traces)
-            im, label_lines = convert_to_imgs(selected_tr, dim, lg_dict)
+            im, label_lines = convert_to_imgs(selected_tr, dim, lg_node_dict)
 
             # initialize img file name
             label_txt.write(save_path + os.sep + img_basename + ".png")

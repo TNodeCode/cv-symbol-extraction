@@ -1,6 +1,4 @@
 import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.patches import Rectangle
 import cv2
 import random
 import torch
@@ -47,12 +45,12 @@ def create_bounding_box(mask, x_start, y_start):
     bbox = [np.min(nz[0]), np.min(nz[1]), np.max(nz[0]), np.max(nz[1])]
 
     # Compute anchor points in Background image
-    x1 = bbox[1] + x_start - 1
-    y1 = bbox[0] + y_start - 1
-    x2 = bbox[3] + x_start + 1
-    y2 = bbox[2] + y_start + 1
+    x1 = bbox[1] + x_start
+    y1 = bbox[0] + y_start
+    x2 = bbox[3] + x_start
+    y2 = bbox[2] + y_start
 
-    # # draw bbox on the image
+    # draw bbox on the image
     # plt.gca().add_patch(Rectangle((x1, y1), x2-x1, y2-y1,
     #                               linewidth=1, edgecolor='r', facecolor='none'))
     return x1, y1, x2, y2
@@ -102,7 +100,7 @@ def get_img_mask(img):
     :param img: Input image.
     :return: Mask of image.
     """
-    mask = img.copy()[:, :, 0]
+    mask = img.copy_nodes()[:, :, 0]
     mask[mask > 0] = 1
     return mask
 
@@ -147,9 +145,9 @@ def resize(img, wanted_width):
 def random_color(image):
     h, w, _ = image.shape
     color = np.zeros((h, w, 3))
-    color[:, : , 0] += random.randint(0, 255)
-    color[:, : , 1] += random.randint(0, 255)
-    color[:, : , 2] += random.randint(0, 255)
+    color[:, :, 0] += random.randint(0, 255)
+    color[:, :, 1] += random.randint(0, 255)
+    color[:, :, 2] += random.randint(0, 255)
     image[:, :, :3] = color
     return image
 
@@ -168,15 +166,10 @@ def place_image_on_background(label, image, background, coordinates, i):
     img = image
     scale = 1
 
-
     # resize and find coordinates
-    # rand_int = random.randint(int(image.shape[0]/2), int(image.shape[0]*1.3))
-    # img, scale = resize(image, rand_int)
     co = torch.tensor(provide_random_coordinates(
         background, img)).reshape((1, 4))
     while not overlap(co, coordinates):
-        # rand_int = random.randint(int(image.shape[0]/2), int(image.shape[0]*1.3))
-        # img, scale = resize(image, rand_int)
         co = torch.tensor(provide_random_coordinates(
             background, img)).reshape((1, 4))
     coordinates[i] = co
