@@ -1,4 +1,5 @@
 import torch
+import numpy as np
 import random as r
 import json
 from seqgen.vocabulary import *
@@ -75,7 +76,7 @@ def generate_random_sequence(in_voc: list, out_voc: list, continue_prob=0.9, max
         random_choice = r.random()
         
         # Generate random boxes    
-        if random_choice < 0.8:
+        if random_choice < 1.0: # TODO change this value to 0.8 again
             gen = gen_default_box
         elif random_choice < 0.9 and len(seq_out) < max_length - 2:
             gen = gen_index_box
@@ -180,6 +181,6 @@ def generate_synthetic_training_data(num_samples=16, max_length=10, continue_pro
     vocab_out = Vocabulary(vocab_filename="seqgen/vocab_out.txt")
     features, targets = generator(num_samples, max_length=max_length, continue_prob=continue_prob, swap_prob=swap_prob, swap_times=swap_times)
     features = encode_classes_of_bboxes(features, vocab_in)
-    features = normalize_coordinates(features)
+    #features = normalize_coordinates(features)
     targets = encode_latex_tokens(targets, vocab_out)
     return torch.tensor(features).to(device), torch.tensor(targets).to(device)
