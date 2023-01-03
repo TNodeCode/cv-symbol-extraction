@@ -152,9 +152,9 @@ class DecoderRNN2(torch.nn.Module):
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
         self.attn = AdditiveAttention(hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, max_length=max_length)
         if bidirectional:
-            lstm_input_dim = embedding_dim + 2*num_layers*hidden_size
+            lstm_input_dim = embedding_dim + 2*hidden_size
         else:
-            lstm_input_dim = embedding_dim + num_layers*hidden_size
+            lstm_input_dim = embedding_dim + hidden_size
         self.lstm = torch.nn.LSTM(lstm_input_dim, hidden_size, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional, batch_first=True)
         if self.bidirectional:
             self.fc = torch.nn.Linear(2*hidden_size, vocab_size)
@@ -164,8 +164,9 @@ class DecoderRNN2(torch.nn.Module):
 
     def forward(self, x, coordinates, encoder_outputs, position, hidden):
         # Compute attention based context vector
-        hn_reshaped = concat_hidden_states(hidden[0]).repeat(self.max_length,1,1).permute(1,0,2)
-        context_vector = self.attn(hn_reshaped, encoder_outputs)
+        n_layers = 2 if self.bidirectional else 1
+        hn_reshaped = concat_hidden_states(hidden[0][-n_layers:]).repeat(self.max_length,1,1).permute(1,0,2)
+        context_vector, attention = self.attn(hn_reshaped, encoder_outputs)
         # First run the input sequences through an embedding layer
         x = self.embedding(x)
         # Concatenate embeddings with context vector
@@ -186,7 +187,7 @@ class DecoderRNN2(torch.nn.Module):
         # Finally map the outputs of the LSTM layer to a probability distribution
         x = self.softmax(x)
         # Return the prediction and the hidden state of the decoder
-        return x, hidden
+        return x, hidden, attention
 
     def initHidden(self, batch_size, device='cpu'):
         if self.bidirectional:
@@ -199,7 +200,7 @@ class DecoderRNN2(torch.nn.Module):
 class AdditiveAttention(torch.nn.Module):
     def __init__(self, hidden_size, num_layers, bidirectional, max_length):
         super(AdditiveAttention, self).__init__()
-        energy_input_dim = hidden_size * num_layers * 2
+        energy_input_dim = hidden_size * 2
         if bidirectional:
             energy_input_dim *= 2
         self.energy = torch.nn.Linear(energy_input_dim, 1)
@@ -217,33 +218,7 @@ class AdditiveAttention(torch.nn.Module):
         # batch matrix multiplication of attention and encoder outputs
         context_vector = torch.bmm(attention.permute(0, 2, 1), annotations)
         print("CONTEXT VECTOR SHAPE", context_vector.shape) if logging else None
-        return context_vector
-    
-
-# @see: https://buomsoo-kim.github.io/attention/2020/03/19/Attention-mechanism-13.md/
-class AdditiveAttentionDecoder(torch.nn.Module):
-    def __init__(self, embedding_dim, hidden_size, vocab_size, max_length=20, num_layers=3, dropout=0.1, bidirectional=True, pos_encoding=False, device='cpu'):
-        super(AdditiveAttentionDecoder, self).__init__()
-        self.device = device
-        self.max_length = max_length
-        self.vocab_size = vocab_size
-        self.embedding_dim = embedding_dim
-        self.hidden_size = hidden_size
-        self.num_layers = num_layers
-        self.bidirectional = bidirectional
-        self.pos_encoding = pos_encoding
-
-        self.dropout = torch.nn.Dropout(dropout)
-        self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
-        self.attention = torch.nn.Linear(hidden_size*2, 1)
-        self.gru = torch.nn.GRU(hidden_size + embedding_dim, hidden_size)
-        self.dense = nn.Linear(hidden_size, vocab_size)
-        self.log_softmax = torch.nn.LogSoftmax(dim=2)
-        
-    def forward(self, decoder_input, current_hidden_state, encoder_hidden_state):
-        decoder_input = self.embedding(decoder_input).view(1, 1, -1)
-        aligned_weights = torch.randn(encoder_hidden_state.size(0))
-        
+        return context_vector, attention        
 
 
 class AttnDecoderRNN(torch.nn.Module):
