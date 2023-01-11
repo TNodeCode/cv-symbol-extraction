@@ -37,6 +37,10 @@ def get_coordinate_encoding(coordinates, d, n=10000, device='cpu'):
     return P
 
 
+def repeat_hidden_state(hn, max_length):
+    return hn.reshape(1, hn.size(0), hn.size(1)).repeat(max_length, 1, 1).permute(1,0,2)
+
+
 def concat_hidden_states(hn):
     """
     Concatenate hidden state vectors from multiple hidden layers
@@ -47,7 +51,18 @@ def concat_hidden_states(hn):
     for i in range(len(hn)):
         hn_list.append(hn[i])
     c = torch.cat(hn_list, dim=1)
-    return c    
+    return c
+
+
+def concat_and_repeat_hidden_state(hn, max_length):
+    hn_cat = concat_hidden_states(hn)
+    return repeat_hidden_state(hn_cat, max_length=max_length)
+
+
+def combine_encoder_annotations_and_hidden_state(hn, annotations):
+    max_length = annotations.size(1)
+    hn_rep = concat_and_repeat_hidden_state(hn, max_length=max_length)
+    return torch.cat([hn_rep, annotations], dim=2)
 
 
 class EncoderRNN(torch.nn.Module):
@@ -148,9 +163,9 @@ class DecoderRNN2(torch.nn.Module):
         self.bidirectional = bidirectional
         self.pos_encoding = pos_encoding
 
+        self.attn = AdditiveAttention(hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, max_length=max_length)
         self.dropout = torch.nn.Dropout(dropout)
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
-        self.attn = AdditiveAttention(hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, max_length=max_length)
         if bidirectional:
             lstm_input_dim = embedding_dim + 2*hidden_size
         else:
@@ -162,11 +177,8 @@ class DecoderRNN2(torch.nn.Module):
             self.fc = torch.nn.Linear(hidden_size, vocab_size)
         self.softmax = torch.nn.LogSoftmax(dim=2)
 
-    def forward(self, x, coordinates, encoder_outputs, position, hidden):
-        # Compute attention based context vector
-        n_layers = 2 if self.bidirectional else 1
-        hn_reshaped = concat_hidden_states(hidden[0][-n_layers:]).repeat(self.max_length,1,1).permute(1,0,2)
-        context_vector, attention = self.attn(hn_reshaped, encoder_outputs)
+    def forward(self, x, coordinates, annotations, position, hidden):
+        context_vector, attention = self.attn(hidden[0].detach(), annotations.detach())
         # First run the input sequences through an embedding layer
         x = self.embedding(x)
         # Concatenate embeddings with context vector
@@ -198,20 +210,31 @@ class DecoderRNN2(torch.nn.Module):
     
     
 class AdditiveAttention(torch.nn.Module):
-    def __init__(self, hidden_size, num_layers, bidirectional, max_length):
+    def __init__(self, hidden_size, num_layers, bidirectional, max_length, use_last_n_states=1):
         super(AdditiveAttention, self).__init__()
-        energy_input_dim = hidden_size * 2
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bidirectional = bidirectional
+        self.max_length = max_length
+        self.last_n_annotations = (2 * self.hidden_size if self.bidirectional else self.hidden_size) * use_last_n_states
+        self.last_n_hidden_states = (2 if self.bidirectional else 1) * use_last_n_states
+        energy_input_dim = 2 * hidden_size * use_last_n_states
         if bidirectional:
             energy_input_dim *= 2
         self.energy = torch.nn.Linear(energy_input_dim, 1)
         self.softmax = torch.nn.Softmax(dim=1)
         self.relu = torch.nn.ReLU()
         
-    def forward(self, decoder_state, annotations, logging=False):
+    def forward(self, hidden, annotations, logging=False):
+        # Combine information from encoder annotations with current hidden state
+        h_st = combine_encoder_annotations_and_hidden_state(
+            hidden[-self.last_n_hidden_states:, :, :],
+            annotations[:, :, -self.last_n_annotations:]
+        )
         # This layer calculates an energy value e_ij for every word.
         # The energy is just a linear combination of the decoder hidden state
         # and the encoder annottations
-        energy = self.relu(self.energy(torch.cat([decoder_state, annotations], dim=2)))
+        energy = self.relu(self.energy(h_st))
         print("ENERGY SHAPE", energy.shape) if logging else None
         # Normalize energy values
         attention = self.softmax(energy)
