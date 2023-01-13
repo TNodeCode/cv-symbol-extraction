@@ -103,6 +103,44 @@ class EncoderRNN(torch.nn.Module):
         return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
 
 
+class EncoderGRU(torch.nn.Module):
+    def __init__(self, vocab_size, embedding_dim, hidden_size, max_length, num_layers=3, dropout=0.1, bidirectional=True, pos_encoding=False, device='cpu'):
+        super(EncoderGRU, self).__init__()
+        self.device = device
+        self.embedding_dim = embedding_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.max_length = max_length
+        self.bidirectional = bidirectional
+        self.pos_encoding = pos_encoding
+
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
+        self.dropout = torch.nn.Dropout(dropout)
+        self.gru = torch.nn.GRU(embedding_dim, hidden_size, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional, batch_first=True)
+
+    def forward(self, x, coordinates, position, hidden):
+        # First run the input sequences through an embedding layer
+        x = self.embedding(x)
+        # Add positional encoding to the embedding
+        if self.pos_encoding:
+            x = x + position        
+        x = self.dropout(x)
+        # Next pass the embeddings to an activation function
+        x = F.relu(x)
+        # Concatenate embeddings with coordinates
+        #x = torch.cat([x, coordinates.unsqueeze(dim=1)], dim=2)
+        # Now we need to run the embeddings through the LSTM layer
+        output, hidden = self.gru(x, hidden)
+        return output, hidden
+
+    def initHidden(self, batch_size, device='cpu'):
+        if self.bidirectional:
+            num_layers = 2 * self.num_layers
+        else:
+            num_layers = self.num_layers
+        return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
+
+
 class DecoderRNN(torch.nn.Module):
     def __init__(self, embedding_dim, hidden_size, vocab_size, max_length, num_layers=3, dropout=0.1, bidirectional=True, pos_encoding=False, device='cpu'):
         super(DecoderRNN, self).__init__()
@@ -152,9 +190,9 @@ class DecoderRNN(torch.nn.Module):
         return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
 
     
-class DecoderRNN2(torch.nn.Module):
-    def __init__(self, embedding_dim, hidden_size, vocab_size, max_length, num_layers=3, dropout=0.1, bidirectional=False, pos_encoding=False, device='cpu'):
-        super(DecoderRNN2, self).__init__()
+class DecoderGRU(torch.nn.Module):
+    def __init__(self, embedding_dim, hidden_size, vocab_size, max_length, num_layers=3, dropout=0.1, bidirectional=True, pos_encoding=False, device='cpu'):
+        super(DecoderGRU, self).__init__()
         self.device = device
         self.max_length = max_length
         self.embedding_dim = embedding_dim
@@ -163,26 +201,18 @@ class DecoderRNN2(torch.nn.Module):
         self.bidirectional = bidirectional
         self.pos_encoding = pos_encoding
 
-        self.attn = AdditiveAttention(hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, max_length=max_length)
         self.dropout = torch.nn.Dropout(dropout)
         self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
-        if bidirectional:
-            lstm_input_dim = embedding_dim + 2*hidden_size
-        else:
-            lstm_input_dim = embedding_dim + hidden_size
-        self.lstm = torch.nn.LSTM(lstm_input_dim, hidden_size, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional, batch_first=True)
+        self.gru = torch.nn.GRU(embedding_dim, hidden_size, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional, batch_first=True)
         if self.bidirectional:
             self.fc = torch.nn.Linear(2*hidden_size, vocab_size)
         else:
             self.fc = torch.nn.Linear(hidden_size, vocab_size)
         self.softmax = torch.nn.LogSoftmax(dim=2)
 
-    def forward(self, x, coordinates, annotations, position, hidden):
-        context_vector, attention = self.attn(hidden[0].detach(), annotations.detach())
+    def forward(self, x, coordinates, position, hidden):
         # First run the input sequences through an embedding layer
         x = self.embedding(x)
-        # Concatenate embeddings with context vector
-        x = torch.cat([x, context_vector], dim=2)
         # Add positional encoding to the embedding
         if self.pos_encoding:
             x = x + position
@@ -193,7 +223,126 @@ class DecoderRNN2(torch.nn.Module):
         # Concatenate embeddings with coordinates
         #x = torch.cat([x, coordinates.unsqueeze(dim=1)], dim=2)
         # Now we need to run the embeddings through the LSTM layer
-        x, hidden = self.lstm(x, hidden)
+        x, hidden = self.gru(x, hidden)
+        # Next run tensor through a fully connected layer that maps the LSTM outputs to the predicted classes
+        x = self.fc(x)
+        # Finally map the outputs of the LSTM layer to a probability distribution
+        x = self.softmax(x)
+        # Return the prediction and the hidden state of the decoder
+        return x, hidden
+
+    def initHidden(self, batch_size, device='cpu'):
+        if self.bidirectional:
+            num_layers = 2 * self.num_layers
+        else:
+            num_layers = self.num_layers
+        return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
+
+    
+class DecoderRNN2(torch.nn.Module):
+    def __init__(self, embedding_dim, hidden_size, vocab_size, max_length, num_layers=3, dropout=0.1, bidirectional=False, pos_encoding=False, device='cpu'):
+        super(DecoderRNN2, self).__init__()
+        self.device = device
+        self.max_length = max_length
+        self.embedding_dim = embedding_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bidirectional = bidirectional
+        self.pos_encoding = pos_encoding
+        use_last_n_states=num_layers
+        self.attn = AdditiveAttention(hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, max_length=max_length, use_last_n_states=use_last_n_states)
+        self.dropout = torch.nn.Dropout(dropout)
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
+        if bidirectional:
+            self.context_dim = 2*use_last_n_states*hidden_size
+        else:
+            self.context_dim = use_last_n_states*hidden_size
+        self.attn_hn = torch.nn.Linear(hidden_size*2, hidden_size)
+        self.lstm = torch.nn.LSTM(embedding_dim, hidden_size, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional, batch_first=True)
+        if self.bidirectional:
+            self.fc = torch.nn.Linear(2*hidden_size, vocab_size)
+        else:
+            self.fc = torch.nn.Linear(hidden_size, vocab_size)
+        self.softmax = torch.nn.LogSoftmax(dim=2)
+
+    def forward(self, x, coordinates, annotations, position, hidden):
+        n_hidden_states = 2*self.num_layers if self.bidirectional else self.num_layers
+        context_vector, attention = self.attn(hidden[0].detach(), annotations.detach())
+        # First run the input sequences through an embedding layer
+        x = self.embedding(x)
+        # Concatenate embeddings with context vector
+        #x = torch.cat([x, context_vector], dim=2)
+        hn_attn = F.tanh(self.attn_hn(torch.cat([context_vector.squeeze(), concat_hidden_states(hidden[0])], dim=1).reshape(hidden[0].size(0), hidden[0].size(1), -1)))
+        # Add positional encoding to the embedding
+        if self.pos_encoding:
+            x = x + position
+        # Add dropout to prevent overfitting
+        x = self.dropout(x)
+        # Next pass the embeddings to an activation function
+        x = F.relu(x)
+        # Concatenate embeddings with coordinates
+        #x = torch.cat([x, coordinates.unsqueeze(dim=1)], dim=2)
+        # Now we need to run the embeddings through the LSTM layer
+        x, hidden = self.lstm(x, (hn_attn, hidden[1]))
+        # Next run tensor through a fully connected layer that maps the LSTM outputs to the predicted classes
+        x = self.fc(x)
+        # Finally map the outputs of the LSTM layer to a probability distribution
+        x = self.softmax(x)
+        # Return the prediction and the hidden state of the decoder
+        return x, hidden, attention
+
+    def initHidden(self, batch_size, device='cpu'):
+        if self.bidirectional:
+            num_layers = 2 * self.num_layers
+        else:
+            num_layers = self.num_layers
+        return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
+
+    
+class DecoderGRUAttention(torch.nn.Module):
+    def __init__(self, embedding_dim, hidden_size, vocab_size, max_length, num_layers=3, dropout=0.1, bidirectional=False, pos_encoding=False, device='cpu'):
+        super(DecoderGRUAttention, self).__init__()
+        self.device = device
+        self.max_length = max_length
+        self.embedding_dim = embedding_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bidirectional = bidirectional
+        self.pos_encoding = pos_encoding
+        use_last_n_states=num_layers
+        self.attn = AdditiveAttention(hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, max_length=max_length, use_last_n_states=use_last_n_states)
+        self.dropout = torch.nn.Dropout(dropout)
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
+        if bidirectional:
+            self.context_dim = 2*use_last_n_states*hidden_size
+        else:
+            self.context_dim = use_last_n_states*hidden_size
+        self.attn_hn = torch.nn.Linear(hidden_size*2, hidden_size)
+        self.gru = torch.nn.GRU(embedding_dim, hidden_size, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional, batch_first=True)
+        if self.bidirectional:
+            self.fc = torch.nn.Linear(2*hidden_size, vocab_size)
+        else:
+            self.fc = torch.nn.Linear(hidden_size, vocab_size)
+        self.softmax = torch.nn.LogSoftmax(dim=2)
+
+    def forward(self, x, coordinates, annotations, position, hidden):
+        n_hidden_states = 2*self.num_layers if self.bidirectional else self.num_layers
+        context_vector, attention = self.attn(hidden.detach(), annotations.detach())
+        # First run the input sequences through an embedding layer
+        x = self.embedding(x)
+        # Concatenate embeddings with context vector
+        hn_attn = F.tanh(self.attn_hn(torch.cat([context_vector.squeeze(), concat_hidden_states(hidden)], dim=1).reshape(hidden.size(0), hidden.size(1), -1)))
+        # Add positional encoding to the embedding
+        if self.pos_encoding:
+            x = x + position
+        # Add dropout to prevent overfitting
+        x = self.dropout(x)
+        # Next pass the embeddings to an activation function
+        x = F.relu(x)
+        # Concatenate embeddings with coordinates
+        #x = torch.cat([x, coordinates.unsqueeze(dim=1)], dim=2)
+        # Now we need to run the embeddings through the LSTM layer
+        x, hidden = self.gru(x, hn_attn)
         # Next run tensor through a fully connected layer that maps the LSTM outputs to the predicted classes
         x = self.fc(x)
         # Finally map the outputs of the LSTM layer to a probability distribution
@@ -223,7 +372,6 @@ class AdditiveAttention(torch.nn.Module):
             energy_input_dim *= 2
         self.energy = torch.nn.Linear(energy_input_dim, 1)
         self.softmax = torch.nn.Softmax(dim=1)
-        self.relu = torch.nn.ReLU()
         
     def forward(self, hidden, annotations, logging=False):
         # Combine information from encoder annotations with current hidden state
@@ -234,7 +382,7 @@ class AdditiveAttention(torch.nn.Module):
         # This layer calculates an energy value e_ij for every word.
         # The energy is just a linear combination of the decoder hidden state
         # and the encoder annottations
-        energy = self.relu(self.energy(h_st))
+        energy = F.tanh(self.energy(h_st))
         print("ENERGY SHAPE", energy.shape) if logging else None
         # Normalize energy values
         attention = self.softmax(energy)
