@@ -31,7 +31,7 @@ def create_dataset_random(dataset_num, img_num):
         for back in backgrounds:
             coordinates = torch.zeros((img_num, 4)).long()
             label_txt.write(str(Path.cwd() / dataset_path / f"{filename}.jpg "))
-            background = cv2.cvtColor(back, cv2.COLOR_RGB2RGBA)
+            background = helper.preprossesing_background(back)
             for i in range(img_num):
                 # print()
                 # print('Image: ', i)

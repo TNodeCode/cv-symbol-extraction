@@ -6,12 +6,18 @@ import matplotlib.pyplot as plt
 from matplotlib.patches import Rectangle
 
 
+def preprossesing_background(background):
+    background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
+    background, _ = resize(background, 700)
+    return background
+
+
 def preprossesing_image(image, labels):
 
     image = swap_black_white(image)
     mask = get_img_mask(image)
     nz = np.nonzero(mask)
-    min_y, max_y = [np.min(nz[0])-1, np.max(nz[0])+1]
+    min_y, max_y = [np.min(nz[0]), np.max(nz[0])+1]
     # min_x, max_x = [np.min(nz[1]), np.max(nz[1])]
 
     image = image[min_y:max_y]  # min_x:max_x if bounding
@@ -211,8 +217,7 @@ def random_color(image):
 
 
 def place_image_on_background(labels, image, background, coordinates, i):
-    # Prepare and resize background
-    background, _ = resize(background, 700)
+    # Prepare and resize image
     image, labels = preprossesing_image(image, labels)
 
     # Prepare image.
