@@ -47,11 +47,7 @@ def concat_hidden_states(hn):
     :parameter hn: Hidden state tensor of shape (num_layers, batch_size, hidden_size)
     :return: Concatenated state tensor of shape (batch_size, hidden_size*num_layers)
     """
-    hn_list = []
-    for i in range(len(hn)):
-        hn_list.append(hn[i])
-    c = torch.cat(hn_list, dim=1)
-    return c
+    return hn.permute(1,0,2).reshape(hn.size(1), -1)
 
 
 def concat_and_repeat_hidden_state(hn, max_length):
@@ -239,9 +235,9 @@ class DecoderGRU(torch.nn.Module):
         return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
 
     
-class DecoderRNN2(torch.nn.Module):
+class DecoderLSTMAttention(torch.nn.Module):
     def __init__(self, embedding_dim, hidden_size, vocab_size, max_length, num_layers=3, dropout=0.1, bidirectional=False, pos_encoding=False, device='cpu'):
-        super(DecoderRNN2, self).__init__()
+        super(DecoderLSTMAttention, self).__init__()
         self.device = device
         self.max_length = max_length
         self.embedding_dim = embedding_dim
@@ -327,10 +323,10 @@ class DecoderGRUAttention(torch.nn.Module):
 
     def forward(self, x, coordinates, annotations, position, hidden):
         n_hidden_states = 2*self.num_layers if self.bidirectional else self.num_layers
-        context_vector, attention = self.attn(hidden.detach(), annotations.detach())
         # First run the input sequences through an embedding layer
         x = self.embedding(x)
-        # Concatenate embeddings with context vector
+        # Compute attention and context vector
+        context_vector, attention = self.attn(hidden, annotations.detach())
         hn_attn = F.tanh(self.attn_hn(torch.cat([context_vector.squeeze(), concat_hidden_states(hidden)], dim=1).reshape(hidden.size(0), hidden.size(1), -1)))
         # Add positional encoding to the embedding
         if self.pos_encoding:
@@ -357,6 +353,64 @@ class DecoderGRUAttention(torch.nn.Module):
             num_layers = self.num_layers
         return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
     
+
+    
+class DecoderGRUAttention2(torch.nn.Module):
+    def __init__(self, embedding_dim, hidden_size, vocab_size, max_length, num_layers=3, dropout=0.1, bidirectional=False, pos_encoding=False, device='cpu'):
+        super(DecoderGRUAttention2, self).__init__()
+        self.device = device
+        self.max_length = max_length
+        self.embedding_dim = embedding_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.bidirectional = bidirectional
+        self.pos_encoding = pos_encoding
+        use_last_n_states=num_layers
+        self.attn = AdditiveAttention(hidden_size=hidden_size, num_layers=num_layers, bidirectional=bidirectional, max_length=max_length, use_last_n_states=use_last_n_states)
+        self.dropout = torch.nn.Dropout(dropout)
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
+        if bidirectional:
+            self.context_dim = 2*use_last_n_states*hidden_size
+        else:
+            self.context_dim = use_last_n_states*hidden_size
+        self.attn_hn = torch.nn.Linear(hidden_size*(num_layers+1), vocab_size)
+        self.gru = torch.nn.GRU(embedding_dim, hidden_size, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional, batch_first=True)
+        if self.bidirectional:
+            self.fc = torch.nn.Linear(2*hidden_size, vocab_size)
+        else:
+            self.fc = torch.nn.Linear(hidden_size, vocab_size)
+        self.softmax = torch.nn.LogSoftmax(dim=1)
+
+    def forward(self, x, coordinates, annotations, position, hidden):
+        n_hidden_states = 2*self.num_layers if self.bidirectional else self.num_layers
+        # First run the input sequences through an embedding layer
+        embedded = self.embedding(x)
+        # Add dropout to prevent overfitting
+        embedded = self.dropout(embedded)
+        # Next pass the embeddings to an activation function
+        #embedded = F.relu(embedded)
+        # Now we need to run the embeddings through the LSTM layer
+        rnn_output, hidden = self.gru(embedded, hidden)
+        # Compute attention and context vector
+        context_vector, attention = self.attn(hidden, annotations.detach())
+        #print("RNN PUT", rnn_output.shape, "CONTEXT", context_vector.shape)
+        output = self.attn_hn(torch.cat([rnn_output.squeeze(), context_vector.squeeze()], dim=1))
+        #print("OUTPUT", output.shape)
+        # Next run tensor through a fully connected layer that maps the LSTM outputs to the predicted classes
+        #output = self.fc(output)
+        #print("OUTPUT", output.shape)
+        # Finally map the outputs of the LSTM layer to a probability distribution
+        output = self.softmax(output)
+        # Return the prediction and the hidden state of the decoder
+        return output, hidden, attention
+
+    def initHidden(self, batch_size, device='cpu'):
+        if self.bidirectional:
+            num_layers = 2 * self.num_layers
+        else:
+            num_layers = self.num_layers
+        return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
+    
     
 class AdditiveAttention(torch.nn.Module):
     def __init__(self, hidden_size, num_layers, bidirectional, max_length, use_last_n_states=1):
@@ -370,7 +424,7 @@ class AdditiveAttention(torch.nn.Module):
         energy_input_dim = 2 * hidden_size * use_last_n_states
         if bidirectional:
             energy_input_dim *= 2
-        self.energy = torch.nn.Linear(energy_input_dim, 1)
+        self.energy = torch.nn.Linear(energy_input_dim, 1, bias=False)
         self.softmax = torch.nn.Softmax(dim=1)
         
     def forward(self, hidden, annotations, logging=False):
@@ -382,14 +436,15 @@ class AdditiveAttention(torch.nn.Module):
         # This layer calculates an energy value e_ij for every word.
         # The energy is just a linear combination of the decoder hidden state
         # and the encoder annottations
-        energy = F.tanh(self.energy(h_st))
+        #energy = self.energy(h_st)
+        energy = torch.bmm(annotations, concat_hidden_states(hidden).unsqueeze(dim=2))
         print("ENERGY SHAPE", energy.shape) if logging else None
         # Normalize energy values
         attention = self.softmax(energy)
         # batch matrix multiplication of attention and encoder outputs
-        context_vector = torch.bmm(attention.permute(0, 2, 1), annotations)
-        print("CONTEXT VECTOR SHAPE", context_vector.shape) if logging else None
-        return context_vector, attention        
+        context = torch.bmm(attention.permute(0, 2, 1), annotations)
+        print("CONTEXT VECTOR SHAPE", context.shape) if logging else None
+        return context, attention        
 
 
 class AttnDecoderRNN(torch.nn.Module):
