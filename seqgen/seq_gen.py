@@ -130,14 +130,18 @@ def save_as_json(samples, filename="samples.json"):
         json.dump(samples, fp, indent=2)
         
         
-def random_swap(lst, i=None):
+def random_swap(lst, i=None, sos='<start>', eos='<end>'):
     """
     Swap the positions of two elements randomly.
     If you pass a list like ['a','b','c'] to this function you may get ['b','a','c'] back
     """
+    tokens = list(map(lambda x: x[0], lst))
+    seq_len = tokens.index(eos) - 1
+    if seq_len - 1 <= 1:
+        return lst
     if i is None:
-        i = r.randint(1, len(lst) - 2)
-    j = i + 1
+        i = r.randint(1, seq_len)
+        j = r.randint(1, seq_len)
     
     # Tensors and lists have to treated differently, because tensors are implemented in C
     # and use pointers, which leads to a different behaviour than lists
