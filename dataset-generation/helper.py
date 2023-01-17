@@ -4,6 +4,31 @@ import random
 import torch
 
 
+def preprossesing_background(background):
+    background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
+    background = cv2.resize(background, (640, 640)) #resize(background, 700)
+    return background
+
+def preprossesing_image(image, labels):
+    image = swap_black_white(image)
+    mask = get_img_mask(image)
+    nz = np.nonzero(mask)
+    min_y, max_y = [np.min(nz[0]), np.max(nz[0])+1]
+
+    image = image[min_y:max_y]
+
+    bboxes = []
+    for bbox in labels:
+        x1 = int(bbox[0])
+        y1 = (int(bbox[1]) - min_y)
+        x2 = int(bbox[2])
+        y2 = (int(bbox[3]) - min_y)
+        label = bbox[4]
+        bboxes.append([x1, y1, x2, y2, label])
+
+    return image, bboxes
+
+
 def overlap(boxes1, boxes2):
     # top left corners of all combinations
     lt = torch.max(boxes1[:, None, :2], boxes2[:, :2])  # [N,M,2]
@@ -26,19 +51,17 @@ def provide_random_coordinates(background, img, coordinates, i):
     """
     h_img, w_img, _ = img.shape
     h_background, w_background, _ = background.shape
-    y_start = random.randint(5, h_background-h_img-5)
-    x_start = random.randint(5, w_background-w_img-5)
+    y_start = random.randint(15, h_background-h_img - 15)
+    x_start = random.randint(15, w_background-w_img - 15)
 
-    co = torch.tensor([x_start, y_start, x_start + w_img,
-                       y_start + h_img]).reshape((1, 4))
+    co = torch.tensor([x_start - 10, y_start - 10, x_start + w_img + 10, y_start + h_img + 10]).reshape((1, 4))
 
     flag = False
     counter = 0
     while not overlap(co, coordinates):
-        y_start = random.randint(5, h_background - h_img - 5)
-        x_start = random.randint(5, w_background - w_img - 5)
-        co = torch.tensor([x_start, y_start, x_start + w_img,
-                           y_start + h_img]).reshape((1, 4))
+        y_start = random.randint(15, h_background - h_img - 15)
+        x_start = random.randint(15, w_background - w_img - 15)
+        co = torch.tensor([x_start - 10, y_start - 10, x_start + w_img + 10, y_start + h_img + 10]).reshape((1, 4))
         counter += 1
         if counter >= 100:
             flag = True
@@ -74,13 +97,13 @@ def create_bounding_box(mask, x_start, y_start):
     return x1, y1, x2, y2
 
 
-def create_label_objects(x1_start, y1_start, labels, min_y, background_width, background_height):
+def create_label_objects(x1_start, y1_start, labels, background_height, background_width):
     label_list = []
     for bbox in labels:
-        x1 = int(int(bbox[0]) + x1_start)
-        y1 = int(int(bbox[1]) - min_y + y1_start)
-        x2 = int(int(bbox[2]) + x1_start) + 2
-        y2 = int(int(bbox[3]) - min_y + y1_start) + 2
+        x1 = int(bbox[0]) + x1_start
+        y1 = int(bbox[1]) + y1_start
+        x2 = int(bbox[2]) + x1_start
+        y2 = int(bbox[3]) + y1_start
         label = bbox[4]
 
         # yolov7 labels expect normalized x_center, y_center and width and height
@@ -101,17 +124,6 @@ def get_img_mask(img):
     :return: Mask of image.
     """
     mask = img.copy()[:, :, 0]
-    mask[mask > 0] = 1
-    return mask
-
-def get_formulars_mask(formulas):
-    """ Creates mask of given formula image. A mask will allow us to focus on the specific portion of the input formula image,
-    in our case - a formula.
-
-    :param formula: Input formula image.
-    :return: Mask of image.
-    """
-    mask = np.copy(formulas)[:, :, :, 0]
     mask[mask > 0] = 1
     return mask
 
@@ -152,27 +164,17 @@ def random_color(image):
     return image
 
 
-def place_image_on_background(label, image, background, coordinates, i):
-    # Prepare and resize background
-    background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
-    background, _ = resize(background, 700)
+def place_image_on_background(labels, image, background, coordinates, i):
+    # Prepare and resize image
+    image, labels = preprossesing_image(image, labels)
 
-    # Prepare image.
-    image = swap_black_white(image)
     mask = get_img_mask(image)
-    nz = np.nonzero(mask)
-    min_y = np.min(nz[0])
-    max_y = np.max(nz[0])
-    image = image[min_y:max_y]
-    img = image
-
-    mask = get_img_mask(img)
-    img[:, :, 3] = mask
-    img = random_color(img)
+    image[:, :, 3] = mask
+    image = random_color(image)
     background_alpha = 1.0 - mask
 
     # get placement coordinates
-    x_start, y_start, x_end, y_end, flag = provide_random_coordinates(background, img, coordinates, i)
+    x_start, y_start, x_end, y_end, flag = provide_random_coordinates(background, image, coordinates, i)
 
     if flag:
         return background, None, flag
@@ -180,13 +182,13 @@ def place_image_on_background(label, image, background, coordinates, i):
     # use numpy indexing to place the resized image in the background image
     for c in range(0, 3):
         background[y_start:y_end, x_start:x_end, c] = \
-            (mask * img[:, :, c] + background_alpha *
+            (mask * image[:, :, c] + background_alpha *
              background[y_start:y_end, x_start:x_end, c])
-
-    x1_start, y1_start, _, _ = create_bounding_box(mask, x_start, y_start)
+    
     background_height, background_width = background.shape[:2]
-    label_text = create_label_objects(x1_start, y1_start, label, min_y, background_width, background_height)
-    return background, label_text, False
+    label_text = create_label_objects(x_start, y_start, labels, background_height, background_width)
+
+    return background, label_text, flag
 
 
 
