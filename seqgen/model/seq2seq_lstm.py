@@ -19,21 +19,21 @@ def get_position_encoding(seq_len, d, n=10000, device='cpu'):
             P[k, 2*i+1] = torch.cos(k/denominator)
     return P
 
-def get_coordinate_encoding(coordinates, d, n=10000, device='cpu'):
+def get_coordinate_encoding(coordinates, d, max_length, n=10000, device='cpu'):
     batch_size = coordinates.shape[0]
     seq_len = coordinates.shape[1]
     P = torch.zeros((batch_size, seq_len, d)).to(device)
     for k in range(seq_len):
         for i in torch.arange(int(d/8)):
             denominator = n ** (2*i/d)
-            P[:, k, 8*i+0] = torch.sin(coordinates[:, k, 0]/denominator)
-            P[:, k, 8*i+1] = torch.cos(coordinates[:, k, 0]/denominator)
-            P[:, k, 8*i+2] = torch.sin(coordinates[:, k, 1]/denominator)
-            P[:, k, 8*i+3] = torch.cos(coordinates[:, k, 1]/denominator)
-            P[:, k, 8*i+4] = torch.sin(coordinates[:, k, 2]/denominator)
-            P[:, k, 8*i+5] = torch.cos(coordinates[:, k, 2]/denominator)
-            P[:, k, 8*i+6] = torch.sin(coordinates[:, k, 3]/denominator)
-            P[:, k, 8*i+7] = torch.cos(coordinates[:, k, 3]/denominator)
+            P[:, k, 8*i+0] = torch.sin(coordinates[:, k, 0]*max_length/denominator)
+            P[:, k, 8*i+1] = torch.cos(coordinates[:, k, 0]*max_length/denominator)
+            P[:, k, 8*i+2] = torch.sin(coordinates[:, k, 1]*max_length/denominator)
+            P[:, k, 8*i+3] = torch.cos(coordinates[:, k, 1]*max_length/denominator)
+            P[:, k, 8*i+4] = torch.sin(coordinates[:, k, 2]*max_length/denominator)
+            P[:, k, 8*i+5] = torch.cos(coordinates[:, k, 2]*max_length/denominator)
+            P[:, k, 8*i+6] = torch.sin(coordinates[:, k, 3]*max_length/denominator)
+            P[:, k, 8*i+7] = torch.cos(coordinates[:, k, 3]*max_length/denominator)
     return P
 
 
@@ -118,6 +118,70 @@ class EncoderGRU(torch.nn.Module):
     def forward(self, x, coordinates, position, hidden):
         # First run the input sequences through an embedding layer
         embedded = self.dropout(self.embedding(x))
+        # Now we need to run the embeddings through the LSTM layer
+        output, hidden = self.rnn(embedded, hidden)
+        return output, hidden
+
+    def initHidden(self, batch_size, device='cpu'):
+        if self.bidirectional:
+            num_layers = 2 * self.num_layers
+        else:
+            num_layers = self.num_layers
+        return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
+
+
+class EncoderGRUPosEnc(torch.nn.Module):
+    def __init__(self, vocab_size, embedding_dim, hidden_size, max_length, num_layers=3, dropout=0.1, bidirectional=True, pos_encoding=False, device='cpu'):
+        super(EncoderGRUPosEnc, self).__init__()
+        self.device = device
+        self.embedding_dim = embedding_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.max_length = max_length
+        self.bidirectional = bidirectional
+        self.pos_encoding = pos_encoding
+
+        ### Layers ###
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
+        self.dropout = torch.nn.Dropout(dropout)
+        self.rnn = torch.nn.GRU(embedding_dim, hidden_size, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional, batch_first=True)
+
+    def forward(self, x, coordinates, position, hidden):
+        # First run the input sequences through an embedding layer
+        embedded = self.dropout(self.embedding(x) + position)
+        # Now we need to run the embeddings through the LSTM layer
+        output, hidden = self.rnn(embedded, hidden)
+        return output, hidden
+
+    def initHidden(self, batch_size, device='cpu'):
+        if self.bidirectional:
+            num_layers = 2 * self.num_layers
+        else:
+            num_layers = self.num_layers
+        return torch.zeros(num_layers, batch_size, self.hidden_size).to(device)
+
+
+class EncoderGRUCoords(torch.nn.Module):
+    def __init__(self, vocab_size, embedding_dim, hidden_size, max_length, num_layers=3, dropout=0.1, bidirectional=True, pos_encoding=False, device='cpu'):
+        super(EncoderGRUCoords, self).__init__()
+        self.device = device
+        self.embedding_dim = embedding_dim
+        self.hidden_size = hidden_size
+        self.num_layers = num_layers
+        self.max_length = max_length
+        self.bidirectional = bidirectional
+        self.pos_encoding = pos_encoding
+
+        ### Layers ###
+        self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
+        self.dropout = torch.nn.Dropout(dropout)
+        self.rnn = torch.nn.GRU(embedding_dim+4, hidden_size, num_layers=num_layers, dropout=dropout, bidirectional=bidirectional, batch_first=True)
+
+    def forward(self, x, coordinates, position, hidden):
+        # First run the input sequences through an embedding layer
+        embedded = self.dropout(self.embedding(x))
+        # Concatenate embeddings with coordinates
+        embedded = torch.cat([embedded, coordinates.unsqueeze(dim=1)], dim=2)
         # Now we need to run the embeddings through the LSTM layer
         output, hidden = self.rnn(embedded, hidden)
         return output, hidden
@@ -329,6 +393,8 @@ class DecoderGRUAttention(torch.nn.Module):
     def forward(self, x, coordinates, annotations, position, hidden):
         # First run the input sequences through an embedding layer
         embedded = self.dropout(self.embedding(x))
+        if self.pos_encoding:
+            embedded = embedded + position
         # Now we need to run the embeddings through the LSTM layer
         rnn_output, hidden_new = self.rnn(embedded, hidden)
         # Compute attention and context vector
@@ -411,15 +477,13 @@ class AdditiveAttention(torch.nn.Module):
         )
         # This layer calculates an energy value e_ij for every word.
         # The energy is just a linear combination of the decoder hidden state
-        # and the encoder annottations
+        # and the encoder annotations
         #energy = self.energy(h_st)
         energy = torch.bmm(annotations, concat_hidden_states(hidden[-self.bi_factor:]).unsqueeze(dim=2))
-        print("ENERGY SHAPE", energy.shape) if logging else None
         # Normalize energy values
         attention = self.softmax(energy)
         # batch matrix multiplication of attention and encoder outputs
         context = torch.bmm(attention.permute(0, 2, 1), annotations)
-        print("CONTEXT VECTOR SHAPE", context.shape) if logging else None
         return context, attention        
 
 
