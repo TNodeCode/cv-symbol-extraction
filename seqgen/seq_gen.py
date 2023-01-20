@@ -76,7 +76,7 @@ def generate_random_sequence(in_voc: list, out_voc: list, continue_prob=0.9, max
         random_choice = r.random()
         
         # Generate random boxes    
-        if random_choice < 0.8:
+        if random_choice < 1.0: # TODO change this value to 0.8
             gen = gen_default_box
         elif random_choice < 0.9 and len(seq_out) < max_length - 2:
             gen = gen_index_box
