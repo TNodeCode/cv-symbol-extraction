@@ -234,9 +234,6 @@ if __name__ == '__main__':
         label_txt = open(save_path_labels + os.sep + 'label' + ".txt", "a")
 
         for idx, file in enumerate(FILES):
-            if idx not in range(1000, 1101):
-                continue
-
             img_path = os.sep.join(file.split(os.sep)[:-1])
             img_name = file.split(os.sep)[-1]
             img_basename = ".".join(img_name.split(".")[:-1])
@@ -261,7 +258,8 @@ if __name__ == '__main__':
                 for file_line in lines:
                     # Remove leading and trailing whitespace from the line
                     file_line = file_line.strip()
-                    # Skip empty lines
+                    if file_line.startswith("# Relations from SRT:") or file_line.startswith("# Unused Strokes:"):
+                        break
                     if file_line.startswith("# Object: "):
                         flag = True
                         obj = file_line.split("Object: ")[1][:-1]
