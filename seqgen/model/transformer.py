@@ -95,11 +95,12 @@ class Encoder(nn.Module):
         )
         self.dropout = nn.Dropout(dropout)
         
-    def forward(self, x, mask):
+    def forward(self, x, mask, coordinates):
         N, seq_length = x.shape
-        positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
+        #positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
         
-        out = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
+        #out = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
+        out = self.dropout(self.word_embedding(x) + coordinates)
         
         for layer in self.layers:
             out = layer(out, out, out, mask)
@@ -214,10 +215,10 @@ class Transformer(nn.Module):
         trg_mask = torch.tril(torch.ones((trg_len, trg_len))).expand(N, 1, trg_len, trg_len)
         return trg_mask.to(self.device)
     
-    def forward(self, src, trg):
+    def forward(self, src, trg, coordinates):
         src_mask = self.make_src_mask(src)
         trg_mask = self.make_trg_mask(trg)
-        enc_src = self.encoder(src, src_mask)
+        enc_src = self.encoder(src, src_mask, coordinates)
         out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out
         
