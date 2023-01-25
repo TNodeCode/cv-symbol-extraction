@@ -30,8 +30,8 @@ def create_dataset_random(dataset_size, number_of_formulas):
     formulas_label = formulas_label.readlines()
 
     # Label dictionary encoding for Yolov7
-    label_dict = {}
-    num_distinct_labels = 0
+    label_dict = {"formula": 0}
+    num_distinct_labels = 1
     for j in tqdm(range(dataset_size), total=dataset_size):
 
         back = backgrounds[j % len(backgrounds)]
@@ -53,6 +53,7 @@ def create_dataset_random(dataset_size, number_of_formulas):
                     num_distinct_labels += 1
                 # Replace all "labels" with their corresponding label_dict value (aka the encoded yolov7 labels)
                 label[-1] = label_dict[label[-1]]
+
 
             background, label_line, flag = helper.place_image_on_background(
                 labels, image, background, coordinates, i)

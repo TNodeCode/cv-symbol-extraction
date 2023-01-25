@@ -25,6 +25,9 @@ def preprossesing_image(image, labels):
         y2 = (int(bbox[3]) - min_y)
         label = bbox[4]
         bboxes.append([x1, y1, x2, y2, label])
+    
+    img_x, img_y = image.shape[:2]
+    bboxes.append([0, 0, img_y, img_x, '0'])
 
     return image, bboxes
 
