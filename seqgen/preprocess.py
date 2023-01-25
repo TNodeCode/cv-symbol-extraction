@@ -54,3 +54,21 @@ def normalize_coordinates(feature_seqs):
                 y0, min_y, max_y), min_max(x1, min_x, max_x), min_max(y1, min_y, max_y)])
         encoded_seqs.append(encoded_seq)
     return encoded_seqs
+
+
+def get_coordinate_encoding(coordinates, d, max_length, n=10000, device='cpu'):
+    batch_size = coordinates.shape[0]
+    seq_len = coordinates.shape[1]
+    P = torch.zeros((batch_size, seq_len, d)).to(device)
+    for k in range(seq_len):
+        for i in torch.arange(int(d/8)):
+            denominator = n ** (2*i/d)
+            P[:, k, 8*i+0] = torch.sin(coordinates[:, k, 0]*max_length/denominator)
+            P[:, k, 8*i+1] = torch.cos(coordinates[:, k, 0]*max_length/denominator)
+            P[:, k, 8*i+2] = torch.sin(coordinates[:, k, 1]*max_length/denominator)
+            P[:, k, 8*i+3] = torch.cos(coordinates[:, k, 1]*max_length/denominator)
+            P[:, k, 8*i+4] = torch.sin(coordinates[:, k, 2]*max_length/denominator)
+            P[:, k, 8*i+5] = torch.cos(coordinates[:, k, 2]*max_length/denominator)
+            P[:, k, 8*i+6] = torch.sin(coordinates[:, k, 3]*max_length/denominator)
+            P[:, k, 8*i+7] = torch.cos(coordinates[:, k, 3]*max_length/denominator)
+    return P
