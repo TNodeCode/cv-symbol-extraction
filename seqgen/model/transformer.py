@@ -127,7 +127,44 @@ class Encoder(nn.Module):
         self.max_length = max_length
         
         # Layers
-        self.word_embedding = nn.Embedding(vocab_size, embedding_dim-6)
+        self.word_embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.position_embedding = nn.Embedding(max_length, embedding_dim)
+        self.layers = nn.ModuleList(
+            [
+                TransformerBlock(embedding_dim, heads, dropout, forward_expansion)
+                for _ in range(num_layers)
+            ]
+        )
+        self.dropout = nn.Dropout(dropout)
+        
+    def forward(self, x, mask):
+        N, seq_length = x.shape
+        positions = torch.arange(0, seq_length).expand(N, seq_length).to(self.device)
+        out = self.dropout(self.word_embedding(x) + self.position_embedding(positions))
+        
+        for layer in self.layers:
+            out = layer(out, out, out, mask)
+            
+        return out
+        
+        
+class EncoderCoordsEmbedding(nn.Module):
+    def __init__(self, vocab_size, embedding_dim, num_layers, heads, device, forward_expansion, dropout, max_length, coord_embedding_dim=0):
+        super(EncoderCoordsEmbedding, self).__init__()
+        
+        # Hyperparameters
+        self.embedding_dim = embedding_dim
+        self.coord_embedding_dim = coord_embedding_dim
+        self.vocab_size = vocab_size
+        self.num_layers = num_layers
+        self.heads = heads
+        self.device = device
+        self.forward_expansion = forward_expansion
+        self.dropout_prob = dropout,
+        self.max_length = max_length
+        
+        # Layers
+        self.word_embedding = nn.Embedding(vocab_size, embedding_dim-coord_embedding_dim)
         self.position_embedding = nn.Embedding(max_length, embedding_dim)
         self.layers = nn.ModuleList(
             [
@@ -140,6 +177,43 @@ class Encoder(nn.Module):
     def forward(self, x, mask, coordinates):
         N, seq_length = x.shape
         out = self.dropout(torch.cat([self.word_embedding(x), coordinates], dim=2))
+        
+        for layer in self.layers:
+            out = layer(out, out, out, mask)
+            
+        return out
+        
+        
+class EncoderTrigPosEnc(nn.Module):
+    def __init__(self, vocab_size, embedding_dim, num_layers, heads, device, forward_expansion, dropout, max_length):
+        super(EncoderTrigPosEnc, self).__init__()
+        
+        # Hyperparameters
+        self.embedding_dim = embedding_dim
+        self.vocab_size = vocab_size
+        self.num_layers = num_layers
+        self.heads = heads
+        self.device = device
+        self.forward_expansion = forward_expansion
+        self.dropout_prob = dropout,
+        self.max_length = max_length
+        
+        # Layers
+        self.word_embedding = nn.Embedding(vocab_size, embedding_dim)
+        self.layers = nn.ModuleList(
+            [
+                TransformerBlock(embedding_dim, heads, dropout, forward_expansion)
+                for _ in range(num_layers)
+            ]
+        )
+        self.dropout = nn.Dropout(dropout)
+        
+    def forward(self, x, mask, coordinates):
+        N, seq_length = x.shape
+        out = self.dropout(
+            self.word_embedding(x) +
+            get_coordinate_encoding(coordinates, d=self.embedding_dim, max_length=self.max_length)
+        )
         
         for layer in self.layers:
             out = layer(out, out, out, mask)
@@ -160,6 +234,40 @@ class DecoderBlock(nn.Module):
         query = self.dropout(self.norm(attention + x))
         out = self.transformer_block(value, key, query, src_mask)
         return out
+    
+
+class Classifier(nn.Module):
+    """
+    This module takes the outputs of a transformer and runs them through a classification network
+    that consists of linear layers and a final softmax classification layer.
+    """
+    def __init__(
+        self,
+        trg_vocab_size,
+        embedding_dim,
+        dropout_prob=0.5
+    ):
+        super(Classifier, self).__init__()
+        
+        # Hyperparameters
+        self.trg_vocab_size = trg_vocab_size
+        self.embedding_dim = embedding_dim
+        self.dropout_prob = dropout_prob
+        
+        # Layers
+        self.cls = nn.Sequential(
+            nn.Linear(embedding_dim, embedding_dim),
+            nn.ReLU(),
+            nn.Dropout(p=dropout_prob),
+            nn.Linear(embedding_dim, embedding_dim),
+            nn.ReLU(),
+            nn.Dropout(p=dropout_prob),
+            nn.Linear(embedding_dim, trg_vocab_size),
+            nn.Softmax(dim=2),
+        )
+        
+    def forward(self, x):
+        return self.cls(x)
     
     
 class Decoder(nn.Module):
@@ -186,7 +294,7 @@ class Decoder(nn.Module):
                 for _ in range(num_layers)
             ]
         )
-        self.fc_out = nn.Linear(embedding_dim, vocab_size)
+        self.cls = Classifier(trg_vocab_size=vocab_size, embedding_dim=embedding_dim)
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, x, enc_out, src_mask, trg_mask):
@@ -197,7 +305,7 @@ class Decoder(nn.Module):
         for layer in self.layers:
             x = layer(x, enc_out, enc_out, src_mask, trg_mask)
             
-        out = self.fc_out(x)
+        out = self.cls(x)
         return out
         
         
@@ -223,6 +331,7 @@ class Transformer(nn.Module):
         self.encoder = Encoder(
             vocab_size=src_vocab_size,
             embedding_dim=embedding_dim,
+            coord_embedding_dim=6,
             num_layers=num_layers,
             heads=heads,
             forward_expansion=forward_expansion,
@@ -263,6 +372,274 @@ class Transformer(nn.Module):
         _coords[:, :, 4:5] = (coordinates[:, :, 2] - coordinates[:, :, 0]).unsqueeze(dim=2) # x1 - x0
         _coords[:, :, 5:6] = (coordinates[:, :, 3] - coordinates[:, :, 1]).unsqueeze(dim=2) # y1 - y0
         enc_src = self.encoder(src, src_mask, _coords + self.pos_emb(_coords))
+        out = self.decoder(trg, enc_src, src_mask, trg_mask)
+        return out
+                
+        
+class TransformerCoordsEmbedding(nn.Module):
+    def __init__(
+        self,
+        src_vocab_size,
+        trg_vocab_size,
+        src_pad_idx,
+        trg_pad_idx,
+        embedding_dim=256,
+        num_layers=6,
+        forward_expansion=4,
+        heads=8,
+        dropout=0,
+        device="cuda",
+        max_length=100
+    ):
+        super(TransformerCoordsEmbedding, self).__init__()
+        self.device = device
+        
+        self.pos_emb = nn.Linear(6, 6)
+        self.encoder = EncoderCoordsEmbedding(
+            vocab_size=src_vocab_size,
+            embedding_dim=embedding_dim,
+            coord_embedding_dim=6,
+            num_layers=num_layers,
+            heads=heads,
+            forward_expansion=forward_expansion,
+            dropout=dropout,
+            device=device,
+            max_length=max_length
+        )
+        self.decoder = Decoder(
+            vocab_size=trg_vocab_size,
+            embedding_dim=embedding_dim,
+            num_layers=num_layers,
+            heads=heads,
+            forward_expansion=forward_expansion,
+            dropout=dropout,
+            device=device,
+            max_length=max_length
+        )
+        
+        self.src_pad_idx = src_pad_idx
+        self.trg_pad_idx = trg_pad_idx
+        self.device = device
+        
+    def make_src_mask(self, src):
+        # (N, 1, 1, src_length)
+        src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
+        return src_mask.to(self.device)
+    
+    def make_trg_mask(self, trg):
+        N, trg_len = trg.shape
+        trg_mask = torch.tril(torch.ones((trg_len, trg_len))).expand(N, 1, trg_len, trg_len)
+        return trg_mask.to(self.device)
+    
+    def forward(self, src, trg, coordinates):
+        src_mask = self.make_src_mask(src)
+        trg_mask = self.make_trg_mask(trg)
+        _coords = torch.zeros(coordinates.size(0), coordinates.size(1), 6)
+        _coords[:, :, 0:4] = coordinates
+        _coords[:, :, 4:5] = (coordinates[:, :, 2] - coordinates[:, :, 0]).unsqueeze(dim=2) # x1 - x0
+        _coords[:, :, 5:6] = (coordinates[:, :, 3] - coordinates[:, :, 1]).unsqueeze(dim=2) # y1 - y0
+        enc_src = self.encoder(src, src_mask, _coords + F.tanh(self.pos_emb(_coords)))
+        out = self.decoder(trg, enc_src, src_mask, trg_mask)
+        return out    
+                
+        
+class EncoderModel(nn.Module):
+    def __init__(
+        self,
+        src_vocab_size,
+        trg_vocab_size,
+        src_pad_idx,
+        trg_pad_idx,
+        embedding_dim=256,
+        num_layers=6,
+        forward_expansion=4,
+        heads=8,
+        dropout=0,
+        device="cuda",
+        max_length=100
+    ):
+        super(EncoderModel, self).__init__()
+        self.device = device
+        
+        self.pos_emb = nn.Linear(6, 6)
+        self.encoder = EncoderCoordsEmbedding(
+            vocab_size=src_vocab_size,
+            embedding_dim=embedding_dim,
+            coord_embedding_dim=6,
+            num_layers=num_layers,
+            heads=heads,
+            forward_expansion=forward_expansion,
+            dropout=dropout,
+            device=device,
+            max_length=max_length
+        )
+        self.decoder = Decoder(
+            vocab_size=trg_vocab_size,
+            embedding_dim=embedding_dim,
+            num_layers=num_layers,
+            heads=heads,
+            forward_expansion=forward_expansion,
+            dropout=dropout,
+            device=device,
+            max_length=max_length
+        )
+        self.fc_out = nn.Linear(embedding_dim, trg_vocab_size)
+        self.softmax = nn.Softmax(dim=2)
+
+        
+        self.src_pad_idx = src_pad_idx
+        self.trg_pad_idx = trg_pad_idx
+        self.device = device
+        
+    def make_src_mask(self, src):
+        # (N, 1, 1, src_length)
+        src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
+        return src_mask.to(self.device)
+    
+    def make_trg_mask(self, trg):
+        N, trg_len = trg.shape
+        trg_mask = torch.tril(torch.ones((trg_len, trg_len))).expand(N, 1, trg_len, trg_len)
+        return trg_mask.to(self.device)
+    
+    def forward(self, src, trg, coordinates):
+        src_mask = self.make_src_mask(src)
+        trg_mask = self.make_trg_mask(trg)
+        _coords = torch.zeros(coordinates.size(0), coordinates.size(1), 6)
+        _coords[:, :, 0:4] = coordinates
+        _coords[:, :, 4:5] = (coordinates[:, :, 2] - coordinates[:, :, 0]).unsqueeze(dim=2) # x1 - x0
+        _coords[:, :, 5:6] = (coordinates[:, :, 3] - coordinates[:, :, 1]).unsqueeze(dim=2) # y1 - y0
+        enc_src = self.encoder(src, src_mask, _coords + F.tanh(self.pos_emb(_coords)))
+        out = self.softmax(self.fc_out(enc_src))
+        return out                
+
+    
+class TransformerCoordsEmbeddingDirect(nn.Module):
+    def __init__(
+        self,
+        src_vocab_size,
+        trg_vocab_size,
+        src_pad_idx,
+        trg_pad_idx,
+        embedding_dim=256,
+        num_layers=6,
+        forward_expansion=4,
+        heads=8,
+        dropout=0,
+        device="cuda",
+        max_length=100
+    ):
+        super(TransformerCoordsEmbeddingDirect, self).__init__()
+        self.device = device
+        
+        self.encoder = EncoderCoordsEmbedding(
+            vocab_size=src_vocab_size,
+            embedding_dim=embedding_dim,
+            coord_embedding_dim=6,
+            num_layers=num_layers,
+            heads=heads,
+            forward_expansion=forward_expansion,
+            dropout=dropout,
+            device=device,
+            max_length=max_length
+        )
+        self.decoder = Decoder(
+            vocab_size=trg_vocab_size,
+            embedding_dim=embedding_dim,
+            num_layers=num_layers,
+            heads=heads,
+            forward_expansion=forward_expansion,
+            dropout=dropout,
+            device=device,
+            max_length=max_length
+        )
+        
+        self.src_pad_idx = src_pad_idx
+        self.trg_pad_idx = trg_pad_idx
+        self.device = device
+        
+    def make_src_mask(self, src):
+        # (N, 1, 1, src_length)
+        src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
+        return src_mask.to(self.device)
+    
+    def make_trg_mask(self, trg):
+        N, trg_len = trg.shape
+        trg_mask = torch.tril(torch.ones((trg_len, trg_len))).expand(N, 1, trg_len, trg_len)
+        return trg_mask.to(self.device)
+    
+    def forward(self, src, trg, coordinates):
+        src_mask = self.make_src_mask(src)
+        trg_mask = self.make_trg_mask(trg)
+        _coords = torch.zeros(coordinates.size(0), coordinates.size(1), 6)
+        _coords[:, :, 0:4] = coordinates
+        _coords[:, :, 4:5] = (coordinates[:, :, 2] - coordinates[:, :, 0]).unsqueeze(dim=2) # x1 - x0
+        _coords[:, :, 5:6] = (coordinates[:, :, 3] - coordinates[:, :, 1]).unsqueeze(dim=2) # y1 - y0
+        _coords[:, :, [0,2]] = _coords[:, :, [0,2]] * 50
+        enc_src = self.encoder(src, src_mask, _coords)
+        out = self.decoder(trg, enc_src, src_mask, trg_mask)
+        return out
+                
+        
+class TransformerTrigPosEnc(nn.Module):
+    def __init__(
+        self,
+        src_vocab_size,
+        trg_vocab_size,
+        src_pad_idx,
+        trg_pad_idx,
+        embedding_dim=256,
+        num_layers=6,
+        forward_expansion=4,
+        heads=8,
+        dropout=0,
+        device="cuda",
+        max_length=100
+    ):
+        super(TransformerTrigPosEnc, self).__init__()
+        self.device = device
+        
+        self.encoder = EncoderTrigPosEnc(
+            vocab_size=src_vocab_size,
+            embedding_dim=embedding_dim,
+            num_layers=num_layers,
+            heads=heads,
+            forward_expansion=forward_expansion,
+            dropout=dropout,
+            device=device,
+            max_length=max_length
+        )
+        self.decoder = Decoder(
+            vocab_size=trg_vocab_size,
+            embedding_dim=embedding_dim,
+            num_layers=num_layers,
+            heads=heads,
+            forward_expansion=forward_expansion,
+            dropout=dropout,
+            device=device,
+            max_length=max_length
+        )
+        
+        self.src_pad_idx = src_pad_idx
+        self.trg_pad_idx = trg_pad_idx
+        self.device = device
+        
+    def make_src_mask(self, src):
+        # (N, 1, 1, src_length)
+        src_mask = (src != self.src_pad_idx).unsqueeze(1).unsqueeze(2)
+        return src_mask.to(self.device)
+    
+    def make_trg_mask(self, trg):
+        N, trg_len = trg.shape
+        trg_mask = torch.tril(torch.ones((trg_len, trg_len))).expand(N, 1, trg_len, trg_len)
+        return trg_mask.to(self.device)
+    
+    def forward(self, src, trg, coordinates):
+        src_mask = self.make_src_mask(src)
+        trg_mask = self.make_trg_mask(trg)
+        x_min = torch.min(coordinates[:, :, 0])
+        x_max = torch.max(coordinates[:, :, 2])
+        coordinates[:, :, [0,2]] = coordinates[:, :, [0,2]] * 50
+        enc_src = self.encoder(src, src_mask, coordinates)
         out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out
         

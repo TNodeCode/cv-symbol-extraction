@@ -1,3 +1,6 @@
+import torch
+
+
 def min_max(x, min_val, max_val):
     """
     Min-Max Scaling

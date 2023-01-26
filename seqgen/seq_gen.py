@@ -23,7 +23,7 @@ tmpl_out = ["\\sum", "\\limits", "_",
 def gen_default_box(x0, y0, box_height, box_width, seq_in, seq_out, idx, in_voc, out_voc):
     _box_height = r.uniform(0.75, 1.25) * box_height
     _box_width = r.uniform(0.75, 1.25) * box_width
-    _x0 = x0 + r.uniform(-0.5, 2.0) * _box_width
+    _x0 = x0 + r.uniform(-0.1, 2.0) * _box_width
     _y0 = r.uniform(0.5, 1.0) * y0
     # Append tokens to input and output sequence
     seq_in.append([in_voc[idx], _x0, _y0, _x0 + _box_width, _y0 + _box_height])
