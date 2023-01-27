@@ -26,6 +26,8 @@ def preprossesing_image(image, labels):
         label = bbox[4]
         bboxes.append([x1, y1, x2, y2, label])
 
+    img_x, img_y = image.shape[:2]
+    bboxes.append([0, 0, img_y, img_x, '0'])
     return image, bboxes
 
 
@@ -167,12 +169,11 @@ def random_color(image):
 def place_image_on_background(labels, image, background, coordinates, i):
     # Prepare and resize image
     image, labels = preprossesing_image(image, labels)
-
+    # image = erode_dilate(image) lol. not working.
     mask = get_img_mask(image)
     image[:, :, 3] = mask
     image = random_color(image)
     background_alpha = 1.0 - mask
-
     # get placement coordinates
     x_start, y_start, x_end, y_end, flag = provide_random_coordinates(background, image, coordinates, i)
 
@@ -191,6 +192,23 @@ def place_image_on_background(labels, image, background, coordinates, i):
     return background, label_text, flag
 
 
-
-
-
+def erode_dilate(image):
+    use_dilate = False
+    use_derode = random.randint(0, 1) > 0.5
+    h_erode = random.randint(0, 5)
+    w_erode = random.randint(0, 5)
+    kernel_erode = np.ones((10, 10), np.uint8)
+    if use_derode and use_dilate:
+        h_dilate = random.randint(max(h_erode - 2, 0), h_erode + 2)
+        w_dilate = random.randint(max(w_erode - 2, 0), w_erode + 2)
+        kernel_dilate = np.ones((h_dilate, w_dilate), np.uint8)
+        image = cv2.erode(image, kernel_erode, iterations=1)
+        image = cv2.dilate(image, kernel_dilate, iterations=1)
+    elif use_derode:
+        image = cv2.erode(image, kernel_erode, iterations=1)
+    elif use_dilate:
+        h_dilate = random.randint(0, 2)
+        w_dilate = random.randint(0, 2)
+        kernel_dilate = np.ones((h_dilate, w_dilate), np.uint8)
+        image = cv2.dilate(image, kernel_dilate, iterations=1)
+    return image
