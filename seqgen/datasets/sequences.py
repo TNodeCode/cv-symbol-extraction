@@ -24,9 +24,9 @@ class SyntheticSequenceDataset(Dataset):
             swap_times=self.max_length
         )
         input_seqs = torch.tensor(features[:, :, 0]).to(torch.int64)
-        input_seqs = torch.cat([input_seqs, torch.ones(input_seqs.size(0), 1)], dim=1).to(torch.int64)
+        input_seqs = torch.cat([input_seqs, torch.ones(input_seqs.size(0), 1).to(self.device)], dim=1).to(torch.int64)
         coordinates = torch.tensor(features[:, :, 1:])
-        coordinates = torch.cat([coordinates, torch.zeros(coordinates.size(0), 1, coordinates.size(2))], dim=1)
-        target_seqs = torch.cat([target_seqs, torch.ones(target_seqs.size(0), 1)], dim=1).to(torch.int64)
+        coordinates = torch.cat([coordinates, torch.zeros(coordinates.size(0), 1, coordinates.size(2)).to(self.device)], dim=1)
+        target_seqs = torch.cat([target_seqs, torch.ones(target_seqs.size(0), 1).to(self.device)], dim=1).to(torch.int64)
         
         return input_seqs, coordinates, target_seqs

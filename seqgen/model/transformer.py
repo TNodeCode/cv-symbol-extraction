@@ -212,7 +212,7 @@ class EncoderTrigPosEnc(nn.Module):
         N, seq_length = x.shape
         out = self.dropout(
             self.word_embedding(x) +
-            get_coordinate_encoding(coordinates, d=self.embedding_dim, max_length=self.max_length)
+            get_coordinate_encoding(coordinates, d=self.embedding_dim, max_length=self.max_length).to(self.device)
         )
         
         for layer in self.layers:
@@ -245,25 +245,17 @@ class Classifier(nn.Module):
         self,
         trg_vocab_size,
         embedding_dim,
-        dropout_prob=0.5
     ):
         super(Classifier, self).__init__()
         
         # Hyperparameters
         self.trg_vocab_size = trg_vocab_size
         self.embedding_dim = embedding_dim
-        self.dropout_prob = dropout_prob
         
         # Layers
         self.cls = nn.Sequential(
-            nn.Linear(embedding_dim, embedding_dim),
-            nn.ReLU(),
-            nn.Dropout(p=dropout_prob),
-            nn.Linear(embedding_dim, embedding_dim),
-            nn.ReLU(),
-            nn.Dropout(p=dropout_prob),
             nn.Linear(embedding_dim, trg_vocab_size),
-            nn.Softmax(dim=2),
+            nn.LogSoftmax(dim=2),
         )
         
     def forward(self, x):
