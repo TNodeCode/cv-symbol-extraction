@@ -10,6 +10,7 @@ def preprossesing_background(background):
     return background
 
 def preprossesing_image(image, labels):
+    image = cv2.erode(image, np.ones((10, 10), np.uint8))
     image = swap_black_white(image)
     mask = get_img_mask(image)
     nz = np.nonzero(mask)

@@ -134,6 +134,19 @@ def convert_to_imgs(traces_data, box_axis_size, lg_dict):
     else:
         scale_factor = ((box_axis_size-1) / trace_width)
 
+    # if len(traces_data) < 5:
+    #     box_axis_size = int(box_axis_size / 2)
+    #     pattern_drawn = np.ones(shape=(box_axis_size, box_axis_size), dtype=np.float32)
+    # if len(traces_data) > 15:
+    #     box_axis_size *= 2
+    #     pattern_drawn = np.ones(shape=(box_axis_size, box_axis_size), dtype=np.float32)
+    
+    # if trace_ratio < box_ratio:
+    #     scale_factor = ((box_axis_size-1) / trace_height)
+    # else:
+    #     scale_factor = ((box_axis_size-1) / trace_width)
+
+
     # Create empty array incase the lg_dict entry equals "save"
     trace_index = {}
     for index, traces_all in enumerate(traces_data):
