@@ -2,7 +2,7 @@ import sys, os
 import xml.etree.ElementTree as ET
 import numpy as np
 from skimage.io import imsave
-from skimage.draw import line
+from skimage.draw import line, line_aa
 import scipy.ndimage as ndimage
 
 import warnings
@@ -81,13 +81,13 @@ def draw_pattern(traces,pattern_drawn, box_axis_size):
         for pt_idx in range(len(traces) - 1):
                 # Draw line between the two endpoints of the trace
                 linesX = linesY = []
-                oneLineX, oneLineY = line(r0=traces[pt_idx][1], c0=traces[pt_idx][0],
+                oneLineX, oneLineY, val = line_aa(r0=traces[pt_idx][1], c0=traces[pt_idx][0],
                                               r1=traces[pt_idx + 1][1], c1=traces[pt_idx + 1][0])
 
-                linesX = np.concatenate(
-                    [oneLineX, oneLineX, oneLineX+1]) # We can use this to draw a thicker line
-                linesY = np.concatenate(
-                    [oneLineY+1, oneLineY, oneLineY])
+                linesX = oneLineX# np.concatenate(
+                    #[oneLineX, oneLineX, oneLineX+1]) # We can use this to draw a thicker line
+                linesY = oneLineY #np.concatenate(
+                    #[oneLineY+1, oneLineY, oneLineY])
 
                 # Ensure that the line is within the box (set to 0 or border axis size if not)
                 linesX[linesX < 0] = 0
@@ -96,7 +96,7 @@ def draw_pattern(traces,pattern_drawn, box_axis_size):
                 linesY[linesY < 0] = 0
                 linesY[linesY >= box_axis_size] = box_axis_size-1
 
-                pattern_drawn[linesX, linesY] = 0.0
+                pattern_drawn[linesX, linesY] = val * 255 #0.0
     return pattern_drawn
 
 
@@ -234,9 +234,6 @@ if __name__ == '__main__':
         label_txt = open(save_path_labels + os.sep + 'label' + ".txt", "a")
 
         for idx, file in enumerate(FILES):
-            if idx not in range(1000, 1101):
-                continue
-
             img_path = os.sep.join(file.split(os.sep)[:-1])
             img_name = file.split(os.sep)[-1]
             img_basename = ".".join(img_name.split(".")[:-1])
