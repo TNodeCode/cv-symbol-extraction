@@ -28,7 +28,7 @@ def _create_dataset(dataset_size, backgrounds, number_of_formulas, labels_path, 
             formulas_used += 1
             # latex = formulas_label_dict[image_path.name.split('.')[0]] # FÜR TILO
 
-            labels = list(map(lambda x: x.split(','), formulas_label_dict[image_path.name][1:])) # FÜR TILO #2
+            labels = list(map(lambda x: x.split(','), formulas_label_dict[image_path.name])) # FÜR TILO #2
 
             for label in labels:
                 # check if label already in label_dict
