@@ -10,6 +10,12 @@ def preprossesing_background(background):
     return background
 
 def preprossesing_image(image, labels):
+    use_derode = random.randint(0, 1) > 0.5
+    kernel_size = 0
+    if use_derode:
+        kernel_size = 2
+        kernel_erode = np.ones((kernel_size, kernel_size), np.uint8)
+        image = cv2.morphologyEx(image, cv2.MORPH_RECT, kernel_erode, iterations=1)
     image = erode_dilate(image)
     image = swap_black_white(image)
     mask = get_img_mask(image)
@@ -20,15 +26,15 @@ def preprossesing_image(image, labels):
 
     bboxes = []
     for bbox in labels:
-        x1 = int(bbox[0])
-        y1 = (int(bbox[1]) - min_y)
-        x2 = int(bbox[2])
-        y2 = (int(bbox[3]) - min_y)
+        x1 = int(bbox[0]) - kernel_size
+        y1 = (int(bbox[1]) - min_y) - kernel_size
+        x2 = int(bbox[2]) + kernel_size
+        y2 = (int(bbox[3]) - min_y) + kernel_size
         label = bbox[4]
-        bboxes.append([x1-1, y1-1, x2+1, y2+1, label])
+        bboxes.append([x1, y1, x2, y2, label])
 
     img_x, img_y = image.shape[:2]
-    bboxes.append([0-1, 0-1, img_y+1, img_x+1, '0'])
+    bboxes.append([0-kernel_size, 0-kernel_size, img_y+kernel_size, img_x+kernel_size, '0'])
     return image, bboxes
 
 
