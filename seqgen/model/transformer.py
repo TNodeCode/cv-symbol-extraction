@@ -2,6 +2,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 from seqgen.preprocess import *
+from seqgen.model.classifier import *
 
 
 class SelfAttention(nn.Module):
@@ -235,32 +236,6 @@ class DecoderBlock(nn.Module):
         out = self.transformer_block(value, key, query, src_mask)
         return out
     
-
-class Classifier(nn.Module):
-    """
-    This module takes the outputs of a transformer and runs them through a classification network
-    that consists of linear layers and a final softmax classification layer.
-    """
-    def __init__(
-        self,
-        trg_vocab_size,
-        embedding_dim,
-    ):
-        super(Classifier, self).__init__()
-        
-        # Hyperparameters
-        self.trg_vocab_size = trg_vocab_size
-        self.embedding_dim = embedding_dim
-        
-        # Layers
-        self.cls = nn.Sequential(
-            nn.Linear(embedding_dim, trg_vocab_size),
-            nn.LogSoftmax(dim=2),
-        )
-        
-    def forward(self, x):
-        return self.cls(x)
-    
     
 class Decoder(nn.Module):
     def __init__(self, vocab_size, embedding_dim, num_layers, heads, forward_expansion, dropout, device, max_length):
@@ -286,7 +261,11 @@ class Decoder(nn.Module):
                 for _ in range(num_layers)
             ]
         )
-        self.cls = Classifier(trg_vocab_size=vocab_size, embedding_dim=embedding_dim)
+        self.cls = Classifier(
+            trg_vocab_size=vocab_size,
+            embedding_dim=embedding_dim,
+            softmax_dim=2
+        )
         self.dropout = nn.Dropout(dropout)
         
     def forward(self, x, enc_out, src_mask, trg_mask):
