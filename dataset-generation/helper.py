@@ -10,6 +10,7 @@ def preprossesing_background(background):
     return background
 
 def preprossesing_image(image, labels):
+    image = erode_dilate(image)
     image = swap_black_white(image)
     mask = get_img_mask(image)
     nz = np.nonzero(mask)
@@ -24,10 +25,10 @@ def preprossesing_image(image, labels):
         x2 = int(bbox[2])
         y2 = (int(bbox[3]) - min_y)
         label = bbox[4]
-        bboxes.append([x1, y1, x2, y2, label])
+        bboxes.append([x1-1, y1-1, x2+1, y2+1, label])
 
     img_x, img_y = image.shape[:2]
-    bboxes.append([0, 0, img_y, img_x, '0'])
+    bboxes.append([0-1, 0-1, img_y+1, img_x+1, '0'])
     return image, bboxes
 
 
@@ -197,7 +198,7 @@ def erode_dilate(image):
     use_derode = random.randint(0, 1) > 0.5
     h_erode = random.randint(0, 5)
     w_erode = random.randint(0, 5)
-    kernel_erode = np.ones((10, 10), np.uint8)
+    kernel_erode = np.ones((2, 2), np.uint8)
     if use_derode and use_dilate:
         h_dilate = random.randint(max(h_erode - 2, 0), h_erode + 2)
         w_dilate = random.randint(max(w_erode - 2, 0), w_erode + 2)
@@ -205,7 +206,7 @@ def erode_dilate(image):
         image = cv2.erode(image, kernel_erode, iterations=1)
         image = cv2.dilate(image, kernel_dilate, iterations=1)
     elif use_derode:
-        image = cv2.erode(image, kernel_erode, iterations=1)
+        image = cv2.morphologyEx(image, cv2.MORPH_RECT, kernel_erode, iterations=1) # cv2.erode(image, kernel_erode, iterations=1)
     elif use_dilate:
         h_dilate = random.randint(0, 2)
         w_dilate = random.randint(0, 2)
