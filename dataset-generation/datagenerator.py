@@ -6,6 +6,7 @@ import sys
 from pathlib import Path
 from tqdm import tqdm
 from sklearn.model_selection import train_test_split
+import os
 
 # CUDA_VISIBLE_DEVICES=0,1
 
@@ -89,7 +90,7 @@ def create_dataset_random(dataset_size, number_of_formulas):
     for line in formulas_label:
         line = line.rstrip('\n')
         line = line.split(' ')
-        key = line[0].split('/')[2]
+        key = line[0].split(os.sep)[2]
         formulas_label_dict[key] = line[1:]
 
     formulas = [file for file in formulas_path.glob("*.png")]
