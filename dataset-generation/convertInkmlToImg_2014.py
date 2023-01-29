@@ -258,7 +258,8 @@ if __name__ == '__main__':
                 for file_line in lines:
                     # Remove leading and trailing whitespace from the line
                     file_line = file_line.strip()
-                    # Skip empty lines
+                    if file_line.startswith("# Relations from SRT:") or file_line.startswith("# Unused Strokes:"):
+                        break
                     if file_line.startswith("# Object: "):
                         flag = True
                         obj = file_line.split("Object: ")[1][:-1]
