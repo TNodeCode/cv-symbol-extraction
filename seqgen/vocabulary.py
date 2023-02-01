@@ -71,6 +71,18 @@ class Vocabulary(object):
             tokens = content.split("\n")
             for token in tokens:
                 self.add_word(token)
+                
+    def encode(self, word):
+        """
+        Translate a word to an index
+        """
+        return self.word2idx[word]
+
+    def encode_sequence(self, sequence):
+        """
+        Translate a sequence of words to a sequence of indices
+        """
+        return [self.word2idx[word] for word in sequence]
 
     def decode(self, index):
         """

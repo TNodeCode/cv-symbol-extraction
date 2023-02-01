@@ -39,7 +39,7 @@ def encode_latex_tokens(sequences, vocab):
     return encoded_sequences
 
 
-def normalize_coordinates(feature_seqs):
+def normalize_coordinates(feature_seqs, contains_class=True):
     """
     Normalize coordinates
     """
@@ -47,14 +47,28 @@ def normalize_coordinates(feature_seqs):
     for feature_seq in feature_seqs:
         encoded_seq = []
         min_x, min_y, max_x, max_y = 1e9, 1e9, -1e9, -1e9
-        for cls, x0, y0, x1, y1 in feature_seq:
-            min_x = min(min_x, x0)
-            max_x = max(max_x, x1)
-            min_y = min(min_y, y0)
-            max_y = max(max_y, y1)
-        for i, (cls, x0, y0, x1, y1) in enumerate(feature_seq):
-            encoded_seq.append([cls, min_max(x0, min_x, max_x), min_max(
-                y0, min_y, max_y), min_max(x1, min_x, max_x), min_max(y1, min_y, max_y)])
+        if contains_class:
+            for cls, x0, y0, x1, y1 in feature_seq:
+                min_x = min(min_x, x0)
+                max_x = max(max_x, x1)
+                min_y = min(min_y, y0)
+                max_y = max(max_y, y1)
+            for i, (cls, x0, y0, x1, y1) in enumerate(feature_seq):
+                encoded_seq.append([cls, min_max(x0, min_x, max_x), min_max(
+                    y0, min_y, max_y), min_max(x1, min_x, max_x), min_max(y1, min_y, max_y)])
+        else:
+            for x0, y0, x1, y1 in feature_seq:
+                min_x = min(min_x, x0)
+                max_x = max(max_x, x1)
+                min_y = min(min_y, y0)
+                max_y = max(max_y, y1)
+            for i, (x0, y0, x1, y1) in enumerate(feature_seq):
+                encoded_seq.append([
+                    min_max(x0, min_x, max_x),
+                    min_max(y0, min_y, max_y),
+                    min_max(x1, min_x, max_x),
+                    min_max(y1, min_y, max_y)
+                ])
         encoded_seqs.append(encoded_seq)
     return encoded_seqs
 

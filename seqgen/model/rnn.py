@@ -160,8 +160,6 @@ class DecoderRNN(torch.nn.Module):
         x = self.dropout(x)
         # Next pass the embeddings to an activation function
         x = F.relu(x)
-        # Concatenate embeddings with coordinates
-        #x = torch.cat([x, coordinates.unsqueeze(dim=1)], dim=2)
         # Now we need to run the embeddings through the LSTM layer
         x, hidden = self.lstm(x, hidden)
         # Next run tensor through a fully connected layer that maps the LSTM outputs to the predicted classes
@@ -209,8 +207,6 @@ class DecoderGRU(torch.nn.Module):
         x = self.dropout(x)
         # Next pass the embeddings to an activation function
         x = F.relu(x)
-        # Concatenate embeddings with coordinates
-        #x = torch.cat([x, coordinates.unsqueeze(dim=1)], dim=2)
         # Now we need to run the embeddings through the LSTM layer
         x, hidden = self.gru(x, hidden)
         # Next run tensor through a fully connected layer that maps the LSTM outputs to the predicted classes
@@ -229,13 +225,14 @@ class DecoderGRU(torch.nn.Module):
 
     
 class RecurrentAttentionDecoder(torch.nn.Module):
-    def __init__(self, cell_type, embedding_type, embedding_dim, hidden_size, vocab_size, max_length, num_layers=3, dropout=0.1, bidirectional=False, pos_encoding=False, attention_type=AttentionType.DOT, device='cpu'):
+    def __init__(self, cell_type, embedding_type, embedding_dim, hidden_size, vocab_size, max_length, batch_size, num_layers=3, dropout=0.1, bidirectional=False, pos_encoding=False, attention_type=AttentionType.DOT, device='cpu'):
         super(RecurrentAttentionDecoder, self).__init__()
         
         # Hyperparameters
         self.device = device
         self.cell_type = cell_type
         self.max_length = max_length
+        self.batch_size = batch_size
         self.embedding_type = embedding_type
         self.embedding_dim = embedding_dim
         self.dropout = dropout
@@ -254,8 +251,6 @@ class RecurrentAttentionDecoder(torch.nn.Module):
             max_length=max_length,
             device=device            
         )
-        #self.embedding = torch.nn.Embedding(vocab_size, embedding_dim)
-        #self.attn_hn = torch.nn.Linear(hidden_size*(self.bi_factor*2), vocab_size)
         self.rnn = CellType.rnn_layer(cell_type)(
             embedding_dim,
             hidden_size,
@@ -268,7 +263,8 @@ class RecurrentAttentionDecoder(torch.nn.Module):
             hidden_size=hidden_size,
             num_layers=num_layers,
             bidirectional=bidirectional,
-            max_length=max_length
+            max_length=max_length,
+            batch_size=batch_size,
         )
         self.cls = Classifier(
             trg_vocab_size=vocab_size,
@@ -291,10 +287,7 @@ class RecurrentAttentionDecoder(torch.nn.Module):
             hidden_new[0] if self.cell_type == CellType.LSTM else hidden_new,
             annotations
         )
-        # Concatenate ocntext vector and output of RNN layer
-        #output = self.attn_hn(torch.cat([rnn_output.squeeze(), context_vector.squeeze()], dim=1))
         # Finally map the outputs of the LSTM layer to a probability distribution
-        #output = self.softmax(output)
         output = self.cls(torch.cat([rnn_output.squeeze(), context_vector.squeeze()], dim=1))
         # Return the prediction and the hidden state of the decoder
         return output, hidden_new, attention
