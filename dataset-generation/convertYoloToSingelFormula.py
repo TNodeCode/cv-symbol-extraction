@@ -62,6 +62,7 @@ def convertYoloToSingelFormula():
 
     yolo_labels = [file for file in yolo_labels_path.glob("*.txt")]
 
+    output_counter = 0
     for file in yolo_labels:
         labels = open(file, "r").readlines()
         labels = list(map(lambda x: torch.Tensor(
@@ -71,7 +72,7 @@ def convertYoloToSingelFormula():
         boxes2 = torch.stack(labels)[:, 1:]
         boxes2 = coordinatesConverter(boxes2, 640, 640)
 
-        for f, formula in enumerate(formulas_in_image):
+        for formula in formulas_in_image:
             boxes1 = formula[1:].clone().reshape((1, 4))
             boxes1 = coordinatesConverter(boxes1, 640, 640)
 
@@ -83,13 +84,14 @@ def convertYoloToSingelFormula():
             boxes_in_formula = [[int(box[0]), *box[1:]]
                                 for box in boxes_in_formula if box[0] != fomrula_code]
 
-            label_txt = open(formulaLabels_path / f"{f}.txt", 'a')
+            label_txt = open(formulaLabels_path / f"{output_counter}.txt", 'a')
 
             for line_ in boxes_in_formula:
                 label_txt.write(
                     f"{line_[0]} {line_[1]} {line_[2]} {line_[3]} {line_[4]}")
                 label_txt.write("\n")
             label_txt.close()
+            output_counter += 1
 
             # # For visualization
             # print(boxes_in_formula)
