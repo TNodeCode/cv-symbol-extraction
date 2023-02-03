@@ -2,7 +2,7 @@ import numpy as np
 import cv2
 import random
 import torch
-
+import matplotlib.pyplot as plt
 
 def preprossesing_background(background):
     background = cv2.cvtColor(background, cv2.COLOR_RGB2RGBA)
@@ -16,7 +16,6 @@ def preprossesing_image(image, labels):
         kernel_size = 2
         kernel_erode = np.ones((kernel_size, kernel_size), np.uint8)
         image = cv2.morphologyEx(image, cv2.MORPH_RECT, kernel_erode, iterations=1)
-    image = erode_dilate(image)
     image = swap_black_white(image)
     mask = get_img_mask(image)
     nz = np.nonzero(mask)
@@ -81,7 +80,7 @@ def provide_random_coordinates(background, img, coordinates, i):
     return [x_start, y_start, x_start + w_img, y_start + h_img, flag]
 
 
-def create_bounding_box(mask, x_start, y_start):
+def create_bounding_box(mask, x_start, y_start, label, background_height, background_width, kernel_size):
     """ Creates bounding box around placed image.
 
     :param mask: Mask of placed image.
@@ -95,15 +94,17 @@ def create_bounding_box(mask, x_start, y_start):
     bbox = [np.min(nz[0]), np.min(nz[1]), np.max(nz[0]), np.max(nz[1])]
 
     # Compute anchor points in Background image
-    x1 = bbox[1] + x_start
-    y1 = bbox[0] + y_start
-    x2 = bbox[3] + x_start
-    y2 = bbox[2] + y_start
+    x1 = bbox[1] + x_start - kernel_size
+    y1 = bbox[0] + y_start - kernel_size
+    x2 = bbox[3] + x_start + kernel_size
+    y2 = bbox[2] + y_start + kernel_size
 
-    # draw bbox on the image
-    # plt.gca().add_patch(Rectangle((x1, y1), x2-x1, y2-y1,
-    #                               linewidth=1, edgecolor='r', facecolor='none'))
-    return x1, y1, x2, y2
+    x = (x1 + x2) / 2 / background_width
+    y = (y1 + y2) / 2 / background_height
+    width = (x2 - x1) / background_width
+    height = (y2 - y1) / background_height
+
+    return [label, x, y, width, height]
 
 
 def create_label_objects(x1_start, y1_start, labels, background_height, background_width):
@@ -199,23 +200,37 @@ def place_image_on_background(labels, image, background, coordinates, i):
     return background, label_text, flag
 
 
-def erode_dilate(image):
-    use_dilate = False
-    use_derode = random.randint(0, 1) > 0.5
-    h_erode = random.randint(0, 5)
-    w_erode = random.randint(0, 5)
-    kernel_erode = np.ones((2, 2), np.uint8)
-    if use_derode and use_dilate:
-        h_dilate = random.randint(max(h_erode - 2, 0), h_erode + 2)
-        w_dilate = random.randint(max(w_erode - 2, 0), w_erode + 2)
-        kernel_dilate = np.ones((h_dilate, w_dilate), np.uint8)
-        image = cv2.erode(image, kernel_erode, iterations=1)
-        image = cv2.dilate(image, kernel_dilate, iterations=1)
-    elif use_derode:
-        image = cv2.morphologyEx(image, cv2.MORPH_RECT, kernel_erode, iterations=1) # cv2.erode(image, kernel_erode, iterations=1)
-    elif use_dilate:
-        h_dilate = random.randint(0, 2)
-        w_dilate = random.randint(0, 2)
-        kernel_dilate = np.ones((h_dilate, w_dilate), np.uint8)
-        image = cv2.dilate(image, kernel_dilate, iterations=1)
-    return image
+def place_symbol_on_background(label, symbol, background, coordinates, i):
+    # vielleicht hier noch ein resize davor 
+    
+    use_derode = True #random.randint(0, 1) > 0.5
+    kernel_size = 0
+    if use_derode:
+        kernel_size = 5
+        kernel_erode = np.ones((kernel_size, kernel_size), np.uint8)
+        symbol = cv2.morphologyEx(symbol, cv2.MORPH_ERODE, kernel_erode, iterations=1)
+    # plt.imshow(symbol)
+    # plt.show()
+    
+    
+    symbol = swap_black_white(symbol)
+    mask = get_img_mask(symbol)
+    symbol[:, :, 3] = mask
+    symbol = random_color(symbol)
+    background_alpha = 1.0 - mask
+    # get placement coordinates
+    x_start, y_start, x_end, y_end, flag = provide_random_coordinates(background, symbol, coordinates, i)
+
+    if flag:
+        return background, None, flag
+
+    # use numpy indexing to place the resized symbol in the background symbol
+    for c in range(0, 3):
+        background[y_start:y_end, x_start:x_end, c] = \
+            (mask * symbol[:, :, c] + background_alpha *
+             background[y_start:y_end, x_start:x_end, c])
+    
+    background_height, background_width = background.shape[:2]
+    label_text = create_bounding_box(mask, x_start, y_start, label, background_height, background_width, kernel_size)
+
+    return background, label_text, flag
