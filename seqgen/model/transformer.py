@@ -405,7 +405,7 @@ class TransformerCoordsEmbedding(nn.Module):
     def forward(self, src, trg, coordinates):
         src_mask = self.make_src_mask(src)
         trg_mask = self.make_trg_mask(trg)
-        _coords = torch.zeros(coordinates.size(0), coordinates.size(1), 6)
+        _coords = torch.zeros(coordinates.size(0), coordinates.size(1), 6).to(self.device)
         _coords[:, :, 0:4] = coordinates
         _coords[:, :, 4:5] = (coordinates[:, :, 2] - coordinates[:, :, 0]).unsqueeze(dim=2) # x1 - x0
         _coords[:, :, 5:6] = (coordinates[:, :, 3] - coordinates[:, :, 1]).unsqueeze(dim=2) # y1 - y0

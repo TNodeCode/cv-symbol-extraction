@@ -54,8 +54,13 @@ def normalize_coordinates(feature_seqs, contains_class=True):
                 min_y = min(min_y, y0)
                 max_y = max(max_y, y1)
             for i, (cls, x0, y0, x1, y1) in enumerate(feature_seq):
-                encoded_seq.append([cls, min_max(x0, min_x, max_x), min_max(
-                    y0, min_y, max_y), min_max(x1, min_x, max_x), min_max(y1, min_y, max_y)])
+                encoded_seq.append([
+                    cls,
+                    min_max(x0, min_x, max_x),
+                    min_max(y0, min_y, max_y),
+                    min_max(x1, min_x, max_x),
+                    min_max(y1, min_y, max_y)
+                ])
         else:
             for x0, y0, x1, y1 in feature_seq:
                 min_x = min(min_x, x0)
