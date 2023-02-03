@@ -80,10 +80,19 @@ def create_dataset_random(dataset_size, number_of_formulas):
 
     background_path = Path("archive") / "background_images"
     formulas_path = Path("archive") / "formulas"
+    images_path = Path("archive") / "extracted_images"
 
     backgrounds = [cv2.imread(str(file)) for file in background_path.glob("*.jpg")]
-    formulas_label = open(formulas_path / "label.txt", 'r')
-    formulas_label = formulas_label.readlines()
+    formulas_label = open(formulas_path / "label.txt", 'r').readlines()
+
+    images_labels = []
+    for f in os.listdir(images_path):
+        if len(f) == 1:
+            images_labels.append(f)
+        elif f == 'ascii_124':
+            images_labels.append("|")
+        else:
+            images_labels.append("\\" + f)
 
     # Create dict from formulas_label with key as path to image without archive/formulas/ and value the rest of the line
     formulas_label_dict = {}
