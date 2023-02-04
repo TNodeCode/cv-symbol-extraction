@@ -43,7 +43,7 @@ class AttentionType:
     
     
 class DotAttention(torch.nn.Module):
-    def __init__(self, hidden_size, num_layers, bidirectional, max_length, use_last_n_states=1):
+    def __init__(self, hidden_size, num_layers, bidirectional, max_length, batch_size, use_last_n_states=1):
         super(DotAttention, self).__init__()
         
         # Hyperparameters
@@ -78,7 +78,7 @@ class DotAttention(torch.nn.Module):
     
     
 class GeneralAttention(torch.nn.Module):
-    def __init__(self, hidden_size, num_layers, bidirectional, max_length, use_last_n_states=1):
+    def __init__(self, hidden_size, num_layers, bidirectional, max_length, batch_size, use_last_n_states=1):
         super(GeneralAttention, self).__init__()
         
         # Hyperparameters
@@ -109,7 +109,7 @@ class GeneralAttention(torch.nn.Module):
     
     
 class ConcatAttention(torch.nn.Module):
-    def __init__(self, hidden_size, num_layers, bidirectional, max_length, use_last_n_states=1):
+    def __init__(self, hidden_size, num_layers, bidirectional, max_length, batch_size, use_last_n_states=1):
         super(ConcatAttention, self).__init__()
         
         # Hyperparameters
@@ -122,7 +122,7 @@ class ConcatAttention(torch.nn.Module):
         
         # Layers
         self.Wa = torch.nn.Linear(energy_input_dim, energy_input_dim)
-        self.va = torch.nn.Parameter(torch.FloatTensor(25, 2*self.bi_factor* hidden_size))
+        self.va = torch.nn.Parameter(torch.FloatTensor(batch_size, 2*self.bi_factor* hidden_size))
         self.softmax = torch.nn.Softmax(dim=1)
         
     def forward(self, hidden, annotations, logging=False):

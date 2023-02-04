@@ -19,7 +19,7 @@ def get_sincos_position_encoding(max_length, embedding_dim, n=10000, device='cpu
 class EmbeddingType:
     COORDS_DIRECT = "coords_direct"
     COORDS_RESIDUAL = "coords_residual"
-    POS_TRIGENC = "pos_enc"
+    POS_TRIGENC = "pos_trigenc"
     POS_SUBSPACE = "pos_subspace"
     
     @staticmethod
@@ -27,7 +27,7 @@ class EmbeddingType:
         embedding_types = {
             "coords_direct": DirectCoordinateEmbedding,
             "coords_residual": ResidualCoordinateEmbedding,
-            "pos_enc": PositionEncodingEmbedding,
+            "pos_trigenc": PositionEncodingEmbedding,
             "pos_subspace": PositionSubspaceEmbedding,
         }
         return embedding_types[embedding_type]
@@ -72,7 +72,9 @@ class DirectCoordinateEmbedding(nn.Module):
         # First run the input sequences through an embedding layer
         embedded = self.dropout(self.embedding(x))
         # Concatenate embeddings with coordinates
-        return torch.cat([embedded, coordinates.unsqueeze(dim=1)], dim=2)
+        if (len(coordinates.shape) < len(embedded.shape)):
+            coordinates = coordinates.unsqueeze(dim=1)
+        return torch.cat([embedded, coordinates], dim=2)
 
 
 class ResidualCoordinateEmbedding(nn.Module):

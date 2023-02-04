@@ -2,16 +2,15 @@ import torch
 import numpy as np
 import random as r
 import json
+import string
 from seqgen.vocabulary import *
 from seqgen.preprocess import *
 
 digits_in = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 digits_out = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
-letters_in = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l",
-              "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
-letters_out = ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l",
-               "m", "n", "o", "p", "q", "r", "s", "t", "u", "v", "w", "x", "y", "z"]
+letters_in = string.ascii_uppercase + string.ascii_lowercase
+letters_out = string.ascii_uppercase + string.ascii_lowercase
 
 operators_in = ["op_plus", "op_minus", "op_multiply", "op_divide"]
 operators_out = ["+", "-", "\cdot", "/"]
@@ -200,3 +199,21 @@ def generate_synthetic_training_data(num_samples=16, max_length=10, continue_pro
     features = normalize_coordinates(features)
     targets = encode_latex_tokens(targets, vocab_out)
     return torch.tensor(features).to(device), torch.tensor(targets).to(device)
+
+
+def add_noise_to_coordinates(coordinates):
+    """
+    Add noise to the coordinates
+    """
+    if len(coordinates.shape) == 2:
+        coordinates = np.expand_dims(coordinates, axis=0)
+    print(coordinates.shape)
+    eps = np.random.uniform(-0.1, 0.1, size=(coordinates.shape[0], coordinates.shape[1], 4))
+    width = coordinates[:, 2] - coordinates[:, 0]
+    height = coordinates[:, 3] - coordinates[:, 1]
+    coords = np.zeros_like(coordinates)
+    coords[:, :, 0] = coordinates[:, 0] + eps[:, :, 0] * width
+    coords[:, :, 2] = coordinates[:, 2] + eps[:, :, 2] * width
+    coords[:, :, 1] = coordinates[:, 1] + eps[:, :, 1] * height
+    coords[:, :, 3] = coordinates[:, 3] + eps[:, :, 3] * height
+    return coords    
