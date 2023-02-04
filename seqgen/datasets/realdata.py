@@ -93,8 +93,7 @@ class RealSequencesDataset(Dataset):
     def __getitem__(self, index: int):
         idx = list(np.random.randint(0, self.input_seqs.shape[0], size=(self.batch_size,)))
         _coords = add_noise_to_coordinates(self.coordinates[idx])
-        print(self.coordinates.shape, _coords.shape, type(self.coordinates))
-        return torch.tensor(self.input_seqs[idx]).to(torch.int64), torch.tensor(self.coordinates[idx]), torch.tensor(self.target_seqs[idx]).to(torch.int64)
+        return torch.tensor(self.input_seqs[idx]).to(torch.int64).to(self.device), torch.tensor(self.coordinates[idx]).to(torch.float32).to(self.device), torch.tensor(self.target_seqs[idx]).to(torch.int64).to(self.device)
     
     def reformat_coords(self, coordinates):
         """

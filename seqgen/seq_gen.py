@@ -207,13 +207,12 @@ def add_noise_to_coordinates(coordinates):
     """
     if len(coordinates.shape) == 2:
         coordinates = np.expand_dims(coordinates, axis=0)
-    print(coordinates.shape)
     eps = np.random.uniform(-0.1, 0.1, size=(coordinates.shape[0], coordinates.shape[1], 4))
-    width = coordinates[:, 2] - coordinates[:, 0]
-    height = coordinates[:, 3] - coordinates[:, 1]
+    width = coordinates[:, :, 2] - coordinates[:, :, 0]
+    height = coordinates[:, :, 3] - coordinates[:, :, 1]
     coords = np.zeros_like(coordinates)
-    coords[:, :, 0] = coordinates[:, 0] + eps[:, :, 0] * width
-    coords[:, :, 2] = coordinates[:, 2] + eps[:, :, 2] * width
-    coords[:, :, 1] = coordinates[:, 1] + eps[:, :, 1] * height
-    coords[:, :, 3] = coordinates[:, 3] + eps[:, :, 3] * height
+    coords[:, :, 0] = coordinates[:, :, 0] + eps[:, :, 0] * width
+    coords[:, :, 2] = coordinates[:, :,  2] + eps[:, :, 2] * width
+    coords[:, :, 1] = coordinates[:, :,  1] + eps[:, :, 1] * height
+    coords[:, :, 3] = coordinates[:, :,  3] + eps[:, :, 3] * height
     return coords    
