@@ -72,7 +72,9 @@ class DirectCoordinateEmbedding(nn.Module):
         # First run the input sequences through an embedding layer
         embedded = self.dropout(self.embedding(x))
         # Concatenate embeddings with coordinates
-        return torch.cat([embedded, coordinates.unsqueeze(dim=1)], dim=2)
+        if (len(coordinates.shape) < len(embedded.shape)):
+            coordinates = coordinates.unsqueeze(dim=1)
+        return torch.cat([embedded, coordinates], dim=2)
 
 
 class ResidualCoordinateEmbedding(nn.Module):
