@@ -4,6 +4,8 @@ import numpy as np
 from seqgen.parser import *
 from seqgen.preprocess import *
 from seqgen.seq_gen import *
+import seqgen.symbol_replacement as symbol_replacement
+
 
 
 class RealSequencesDataset(Dataset):
@@ -32,7 +34,7 @@ class RealSequencesDataset(Dataset):
             # parse latex string
             parsed_formula = parse_formula(f, keys)
             # check if parsed formula contains more tokens than the given maximum length
-            if len(parsed_formula) <= self.max_length:
+            if len(parsed_formula) <= self.max_length and self.boxes[i].shape[0] <= self.max_length:
                 # encode the latex tokens
                 target_seq = np.array(self.vocab_out.encode_sequence(parsed_formula))
                 # pad the latex list with zeros at the right side
@@ -93,7 +95,10 @@ class RealSequencesDataset(Dataset):
     def __getitem__(self, index: int):
         idx = list(np.random.randint(0, self.input_seqs.shape[0], size=(self.batch_size,)))
         _coords = add_noise_to_coordinates(self.coordinates[idx])
-        return torch.tensor(self.input_seqs[idx]).to(torch.int64).to(self.device), torch.tensor(self.coordinates[idx]).to(torch.float32).to(self.device), torch.tensor(self.target_seqs[idx]).to(torch.int64).to(self.device)
+        input_seqs, coordinates, target_seqs = torch.tensor(self.input_seqs[idx]).to(torch.int64), torch.tensor(self.coordinates[idx]).to(torch.float32), torch.tensor(self.target_seqs[idx]).to(torch.int64)
+        input_seqs, target_seqs = symbol_replacement.generate_new_sequences(input_seqs, target_seqs, self.vocab_in, self.vocab_out)
+        
+        return input_seqs.to(self.device), coordinates.to(self.device), target_seqs.to(self.device)
     
     def reformat_coords(self, coordinates):
         """
