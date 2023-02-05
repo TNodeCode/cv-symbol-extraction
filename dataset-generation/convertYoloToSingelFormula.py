@@ -85,6 +85,7 @@ def convertYoloToSingelFormula():
                                 for box in boxes_in_formula if box[0] != fomrula_code]
 
             label_txt = open(formulaLabels_path / f"{output_counter}.txt", 'a')
+            label_txt.write(f"{formula[0]} {formula[1]} {formula[2]} {formula[3]} {formula[4]}\n")
 
             for line_ in boxes_in_formula:
                 label_txt.write(
