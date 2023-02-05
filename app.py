@@ -1,8 +1,11 @@
 import streamlit as st
 import torch
-from io import StringIO
 from PIL import Image
-from app.seq2seq import model, predict_sequentially
+from app.seq2seq import predict_sequentially
+import cv2
+from yolov7 import run_yolo
+import numpy as np
+import os
 
 st.title("Deep LaTex Formula Generator")
 
@@ -21,12 +24,20 @@ if uploaded_image is not None:
     # display the image
     st.image(image, caption='Raw image')
 
-    '''
-    TODO run the image through the YOLO model
-    '''
+    # resize image to 640x640 with cv2
+    img = cv2.imread('image.jpg')
+    img = cv2.resize(img, (640, 640))
+
+    # make chalk lines better
+    kernel = np.ones((5, 5), np.uint8)
+    img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
+    cv2.imwrite('image.jpg', img)
+
+    # detect with yolov7
+    img = run_yolo('image.jpg')
 
     st.markdown("### Step 1: Detect symbols with YOLO")
-    image_yolo = Image.open('image.jpg')
+    image_yolo = Image.open('detections' + os.sep + 'image.jpg')
     st.write("Detected tokens")
 
     # Display image with bounding boxes from YOLO
