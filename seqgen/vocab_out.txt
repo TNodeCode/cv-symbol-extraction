@@ -40,6 +40,8 @@ _
 \}
 |
 \vert
+\langle
+\rangle
 a
 b
 c
@@ -139,8 +141,11 @@ Z
 \Psi
 \Omega
 \sin
+\sinh
 \cos
+\cosh
 \tan
+\tanh
 \sqrt
 \log
 \int
@@ -148,7 +153,10 @@ Z
 \limits
 \lim
 \frac
+\dots
 \ldots
+\cdots
+\vdots
 \left
 \right
 \uparrow
