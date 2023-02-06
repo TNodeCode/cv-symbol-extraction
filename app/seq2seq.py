@@ -11,7 +11,7 @@ else:
 num_layers = 2
 embedding_dim = 128
 batch_size = 2
-max_length = 5
+max_length = 50
 heads = 8
 dropout = 0
 
@@ -32,7 +32,7 @@ model = transformer.Transformer(
     device=device
 ).to(device)
 
-checkpoint_file = "transformer_realdata.pt"
+checkpoint_file = "transformer_realdata2.pt"
 checkpoint = torch.load(checkpoint_file, map_location=device)
 model.load_state_dict(checkpoint['model_state_dict'])
 print("MODEL LOADED")

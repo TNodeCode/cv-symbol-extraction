@@ -37,6 +37,15 @@ def detect(weights, source, imgsz, conf_thres=0.25, iou_thres=0.45):
     if not save_dir_txt.exists():
         save_dir_txt.mkdir()
 
+    # if .txt file exists at save_dir_txt/source.stem.txt, delete it
+    if (save_dir_txt / (source[:-4] + ".txt")).exists():
+        (save_dir_txt / (source[:-4] + ".txt")).unlink()
+        # also delete resulting txt files in formulaLabels
+        formulaLabels_path = save_dir / "formulaLabels" / source[:-4]
+        if formulaLabels_path.exists():
+            for file in formulaLabels_path.glob("*.txt"):
+                file.unlink()
+
     # Initialize
     set_logging()
     device = select_device("cpu")

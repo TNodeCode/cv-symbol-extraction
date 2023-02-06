@@ -39,7 +39,7 @@ def coordinatesConverter(bboxes, img_height, img_width):
     return bboxes
 
 
-def convertYoloToSingleFormula():
+def convertYoloToSingleFormula(txt_file_name):
     # replace with Path to custom_data.yaml for encoding
     #with open("C:/Users/benwe/Downloads/custom_data.yaml", "r") as file:
     #    data = yaml.safe_load(file)["names"]
@@ -54,11 +54,11 @@ def convertYoloToSingleFormula():
         yolo_output.mkdir()
     yolo_labels_path = yolo_output / "labels"
 
-    formulaLabels_path = yolo_output / "formulaLabels"
+    formulaLabels_path = yolo_output / "formulaLabels" / txt_file_name[:-4]
     if not formulaLabels_path.exists():
-        formulaLabels_path.mkdir()
+        formulaLabels_path.mkdir(parents=True)
 
-    yolo_labels = [file for file in yolo_labels_path.glob("*.txt")]
+    yolo_labels = [file for file in yolo_labels_path.glob("*.txt") if file.stem == txt_file_name[:-4]]
 
     output_counter = 0
     for file in yolo_labels:
