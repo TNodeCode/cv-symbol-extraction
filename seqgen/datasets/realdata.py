@@ -29,6 +29,7 @@ class RealSequencesDataset(Dataset):
         self.input_seqs = []
         self.coordinates = []
         self.target_seqs = []
+        formula_index = 0
         # parse the formulas
         for i, f in enumerate(formulas):
             # parse latex string
@@ -47,23 +48,25 @@ class RealSequencesDataset(Dataset):
                 input_seq = self.boxes[i][:, 0].astype(np.int32)
                 # extract coordinates rom XcYcWH to XYXY format
                 coords = self.reformat_coords(self.boxes[i][:, 1:5])
-                # check if the sequence starts with a 'formula' box (which has the encoding 0)
-                if (input_seq[-1] == 0):
-                    # remove the 'formula' box from the beginning of the sequence
-                    input_seq = input_seq[:-1]
-                    # also remove the coordinates of the 'formula' box
-                    coords = coords[:-1]
-                    # Check that each box has coordinates, otherwise raise an error
-                    assert len(input_seq) == len(coords), "There should be one box for each token of the input sequence"
-                    # normalize the coordinates (apply minmax to them)
-                    coords = np.array(normalize_coordinates(np.array([coords]), contains_class=False)).squeeze()
-                    # Check if coords are still a 2 array (if sequence contains only 1 token that will not be the case)
-                    if (len(coords.shape) == 1):
-                        coords = coords.reshape(-1, 4)
-                    # also pad the end of the coordinates list
-                    coords = self.pad_coordinates(coords, max_length)
-                    # now append the coordinates of the current sequence to the list of coordinates
-                    self.coordinates.append(coords)
+                # sort the input sequences and the coordinates by the x0 values
+                idx_coords_sorted = np.argsort(coords[:, 0])
+                coords = coords[idx_coords_sorted, :]
+                input_seq = input_seq[idx_coords_sorted]
+                # remove the formula boxes
+                mask = input_seq != formula_index
+                input_seq = input_seq[mask]
+                coords = coords[mask, :]
+                # Check that each box has coordinates, otherwise raise an error
+                assert len(input_seq) == len(coords), "There should be one box for each token of the input sequence"
+                # normalize the coordinates (apply minmax to them)
+                coords = np.array(normalize_coordinates(np.array([coords]), contains_class=False)).squeeze()
+                # Check if coords are still a 2 array (if sequence contains only 1 token that will not be the case)
+                if (len(coords.shape) == 1):
+                    coords = coords.reshape(-1, 4)
+                # also pad the end of the coordinates list
+                coords = self.pad_coordinates(coords, max_length)
+                # now append the coordinates of the current sequence to the list of coordinates
+                self.coordinates.append(coords)
                 # Add 3 to the input sequences, because the YOLO algorithm doesn't add classes for '<sos>', '<eos>' and '<unk>'
                 input_seq += 3
                 # pad the input sequence
