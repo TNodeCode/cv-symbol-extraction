@@ -6,6 +6,8 @@ import cv2
 from yolov7 import run_yolo
 import numpy as np
 import os
+from pathlib import Path
+from seqgen.preprocess import normalize_coordinates
 
 st.title("Deep LaTex Formula Generator")
 
@@ -29,9 +31,9 @@ if uploaded_image is not None:
     img = cv2.resize(img, (640, 640))
 
     # make chalk lines better
-    kernel = np.ones((5, 5), np.uint8)
-    img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
-    cv2.imwrite('image.jpg', img)
+    #kernel = np.ones((5, 5), np.uint8)
+    #img = cv2.morphologyEx(img, cv2.MORPH_CLOSE, kernel)
+    #cv2.imwrite('image.jpg', img)
 
     # detect with yolov7
     img = run_yolo('image.jpg')
@@ -46,18 +48,74 @@ if uploaded_image is not None:
     '''
     TODO run bounding boxes through Seq2Seq model
     '''
-    input_seq = torch.tensor([[0, 5, 5, 1, 1, 1]])
-    coordinates = torch.tensor(
-        [[[0.0, 0.0, 0.0, 0.0], [0.4, 0.3, 0.7, 0.7], [0.8, 0.0, 1.0, 0.3], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0], [0.0, 0.0, 0.0, 0.0]]])
-    print("IN", input_seq.shape, "COORDS", coordinates.shape)
-    prediction = predict_sequentially(
-        input_seqs=input_seq, coordinates=coordinates)
-    prediction = list(prediction)
+    # read in all txt files from detections/formulaLabels/img[:-4] in list
+    print(img[:-4])
+    txt_files = [file for file in Path('detections' + os.sep + 'formulaLabels' + os.sep + img[:-4]).glob("*.txt")]
+    print(len(txt_files))
 
-    st.markdown("### Step 2: Generate LaTeX formula with Seq2Seq model")
-    generated_formula = "a^2+b^2=c^2"
-    st.write("This is the formula the model has generated")
-    st.write("Raw LaTeX formula")
-    st.code("".join(prediction))
-    st.write("Parsed LaTeX formula")
-    st.latex("".join(prediction))
+    for txt_file in txt_files:
+        input_seq_other = []
+        coordinates_other = []
+        input_seq = []
+        coordinates = []
+        input_seq.append(0)
+        coordinates.append([0, 0, 0, 0])
+        # one txt file per formula
+        # read in txt file
+        labels = open(txt_file, "r").readlines()
+        for label in labels:
+            l = []
+            label = label.strip('\n').split(" ")
+            class_label = label[0]
+            class_label = class_label.split(".")[0]
+            class_label = int(class_label) + 3
+            input_seq.append(int(class_label))
+            l.append(float(label[1]))
+            l.append(float(label[2]))
+            l.append(float(label[3]))
+            l.append(float(label[4]))
+            coordinates.append(l)
+        # transform input_seq to tensor
+        counter = 0
+        while len(input_seq) < 50:
+            input_seq.append(1)
+            counter += 1
+
+        input_seq_other.append(input_seq)
+
+        input_seq = torch.Tensor(input_seq_other)
+
+        input_seq = input_seq.to(torch.int64)
+
+        #transform coordinates to tensor
+        coordinates = np.array(coordinates)
+        coordinates[:, 0] = coordinates[:, 0] - 0.5 * coordinates[:, 2]
+        coordinates[:, 1] = coordinates[:, 1] - 0.5 * coordinates[:, 3]
+        coordinates[:, 2] = coordinates[:, 0] + 0.5 * coordinates[:, 2]
+        coordinates[:, 3] = coordinates[:, 1] + 0.5 * coordinates[:, 3]
+
+        coordinates = np.array(normalize_coordinates(np.array([coordinates]), contains_class=False)).squeeze()
+        coordinates = coordinates.tolist()
+        coordinates_other.append(coordinates)
+        coords_end = torch.Tensor([[0.0, 0.0, 0.0, 0.0] for i in range(counter)])
+        coordinates_other = torch.tensor(coordinates_other)
+        # add coords_end to coordinates_other
+        print(coords_end.shape)
+        print(coordinates_other.shape)
+        coords_end = coords_end.unsqueeze(0)
+        print(coords_end.shape)
+        coordinates = torch.cat((coordinates_other, coords_end), dim=1)
+        print(coordinates.shape)
+        print("IN", input_seq.shape, "COORDS", coordinates.shape)
+        prediction = predict_sequentially(
+            input_seqs=input_seq, coordinates=coordinates)
+        prediction = list(prediction)
+
+        st.markdown("### Step 2: Generate LaTeX formula with Seq2Seq model")
+        generated_formula = "a^2+b^2=c^2"
+        st.write("This is the formula the model has generated")
+        st.write("Raw LaTeX formula")
+        st.code("".join(prediction))
+        st.write("Parsed LaTeX formula")
+        st.latex("".join(prediction))
+
