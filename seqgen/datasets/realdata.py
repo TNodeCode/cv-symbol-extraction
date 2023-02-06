@@ -9,12 +9,13 @@ import seqgen.symbol_replacement as symbol_replacement
 
 
 class RealSequencesDataset(Dataset):
-    def __init__(self, filename, vocab_in, vocab_out, max_length, batch_size, sos_idx=0, eos_idx=1, additional_eos=False, device="cpu") -> None:
+    def __init__(self, filename, vocab_in, vocab_out, max_length, batch_size, sos_idx=0, eos_idx=1, pad_idx=2, additional_eos=False, device="cpu") -> None:
         self.max_length = max_length
         self.additional_eos = additional_eos
         self.vocab_in = vocab_in
         self.vocab_out = vocab_out
         self.eos_idx = eos_idx
+        self.pad_idx = pad_idx
         self.batch_size = batch_size
         self.device = device
         # read the label file
@@ -35,13 +36,15 @@ class RealSequencesDataset(Dataset):
             # parse latex string
             parsed_formula = parse_formula(f, keys)
             # check if parsed formula contains more tokens than the given maximum length
-            if len(parsed_formula) <= self.max_length and self.boxes[i].shape[0] <= self.max_length:
+            if len(parsed_formula) <= self.max_length-1 and self.boxes[i].shape[0] <= self.max_length-1:
                 # encode the latex tokens
                 target_seq = np.array(self.vocab_out.encode_sequence(parsed_formula))
+                # Add <eos> token
+                target_seq = np.concatenate([target_seq, np.array([self.eos_idx])])
                 # pad the latex list with zeros at the right side
                 target_seq = np.pad(target_seq, (0, self.max_length - len(target_seq)), mode='constant')
                 # replace with zeros with '<eos>' index
-                target_seq[target_seq == 0] = self.eos_idx
+                target_seq[target_seq == 0] = self.pad_idx
                 # append encoded latex tokens to the list of target sequences
                 self.target_seqs.append(target_seq)
                 # convert input sequence to integers (because they are float at the moment)
@@ -63,23 +66,26 @@ class RealSequencesDataset(Dataset):
                 # Check if coords are still a 2 array (if sequence contains only 1 token that will not be the case)
                 if (len(coords.shape) == 1):
                     coords = coords.reshape(-1, 4)
+                # Add 3 to the input sequences, because the YOLO algorithm doesn't add classes for '<sos>', '<eos>' and '<unk>'
+                input_seq += 3
+                # Add <eos> token
+                input_seq = np.concatenate([input_seq, np.array([self.eos_idx])])
+                coords = np.concatenate([coords, np.array([[0.0,0.0,0.0,0.0]])], axis=0)             
                 # also pad the end of the coordinates list
                 coords = self.pad_coordinates(coords, max_length)
                 # now append the coordinates of the current sequence to the list of coordinates
                 self.coordinates.append(coords)
-                # Add 3 to the input sequences, because the YOLO algorithm doesn't add classes for '<sos>', '<eos>' and '<unk>'
-                input_seq += 3
                 # pad the input sequence
                 input_seq = np.pad(input_seq, (0, self.max_length - len(input_seq)), mode='constant')
                 # replace the zeros from the padding step with the encoded '<eos>' token
-                input_seq[input_seq == 0] = self.eos_idx
+                input_seq[input_seq == 0] = self.pad_idx
                 # add the encoded input sequence to the dataset
                 self.input_seqs.append(input_seq)
         # transform lists of sequences to ndarray
         self.input_seqs = np.concatenate([
             np.ones((len(self.input_seqs),1))*sos_idx,
             np.array(self.input_seqs),
-            np.ones((len(self.input_seqs),1))*eos_idx,
+            np.ones((len(self.input_seqs),1))*pad_idx,
         ], axis=1)
         self.coordinates = np.concatenate([
             np.zeros((len(self.input_seqs),1,4)),
@@ -89,7 +95,7 @@ class RealSequencesDataset(Dataset):
         self.target_seqs = np.concatenate([
             np.ones((len(self.input_seqs),1))*sos_idx,
             np.array(self.target_seqs),
-            np.ones((len(self.input_seqs),1))*eos_idx,
+            np.ones((len(self.input_seqs),1))*pad_idx,
         ], axis=1)
     
     def __len__(self) -> int:
