@@ -99,7 +99,7 @@ class RealSequencesDataset(Dataset):
         idx = list(np.random.randint(0, self.input_seqs.shape[0], size=(self.batch_size,)))
         _coords = add_noise_to_coordinates(self.coordinates[idx])
         input_seqs, coordinates, target_seqs = torch.tensor(self.input_seqs[idx]).to(torch.int64), torch.tensor(self.coordinates[idx]).to(torch.float32), torch.tensor(self.target_seqs[idx]).to(torch.int64)
-        input_seqs, target_seqs = symbol_replacement.generate_new_sequences(input_seqs, target_seqs, self.vocab_in, self.vocab_out)
+        #input_seqs, target_seqs = symbol_replacement.generate_new_sequences(input_seqs, target_seqs, self.vocab_in, self.vocab_out)
         
         return input_seqs.to(self.device), coordinates.to(self.device), target_seqs.to(self.device)
     
