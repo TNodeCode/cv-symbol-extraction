@@ -293,3 +293,159 @@ class Transformer(nn.Module):
         enc_src = self.encoder(src, src_mask, coordinates)
         out = self.decoder(trg, enc_src, src_mask, trg_mask)
         return out           
+    
+    
+class PyTorchTransformer(nn.Module):
+    def __init__(
+        self,
+        encoder_embedding_type,
+        src_vocab_size,
+        trg_vocab_size,
+        src_pad_idx,
+        trg_pad_idx,
+        embedding_dim=256,
+        num_layers=6,
+        forward_expansion=4,
+        heads=8,
+        dropout=0,
+        device="cuda",
+        max_length=100
+    ):
+        super(PyTorchTransformer, self).__init__()
+        self.device = device
+        
+        # Layers
+        self.encoder_embedding = EmbeddingType.embedding_layer(encoder_embedding_type)(
+            vocab_size=src_vocab_size,
+            embedding_dim=embedding_dim,
+            dropout_prob=dropout,
+            max_length=max_length,
+            device=device            
+        )
+        self.decoder_embedding = nn.Embedding(
+            trg_vocab_size,
+            embedding_dim
+        )
+        self.transformer = nn.Transformer(
+            d_model=embedding_dim,
+            nhead=heads,
+            num_encoder_layers=num_layers,
+            num_decoder_layers=num_layers,
+            batch_first=True
+        )
+        self.cls = Classifier(
+            trg_vocab_size=trg_vocab_size,
+            embedding_dim=embedding_dim,
+            softmax_dim=2
+        )
+        
+    def forward(self, src, trg, coordinates):
+        out = self.transformer(
+            self.encoder_embedding(src, coordinates),
+            self.decoder_embedding(trg)
+        )
+        out = self.cls(out)
+        return out
+    
+
+class PyTorchTransformerEncoder(nn.Module):
+    def __init__(
+        self,
+        encoder_embedding_type,
+        src_vocab_size,
+        trg_vocab_size,
+        src_pad_idx,
+        trg_pad_idx,
+        embedding_dim=256,
+        num_layers=6,
+        forward_expansion=4,
+        heads=8,
+        dropout=0,
+        device="cuda",
+        max_length=100
+    ):
+        super(PyTorchTransformerEncoder, self).__init__()
+        self.device = device
+        
+        # Layers
+        self.encoder_embedding = EmbeddingType.embedding_layer(encoder_embedding_type)(
+            vocab_size=src_vocab_size,
+            embedding_dim=embedding_dim,
+            dropout_prob=dropout,
+            max_length=max_length,
+            device=device            
+        )
+        self.encoder_layer = nn.TransformerEncoderLayer(
+            d_model=embedding_dim,
+            nhead=heads
+        )
+        self.encoder = nn.TransformerEncoder(
+            encoder_layer=self.encoder_layer,
+            num_layers=num_layers
+        )
+        self.cls = Classifier(
+            trg_vocab_size=trg_vocab_size,
+            embedding_dim=embedding_dim,
+            softmax_dim=2
+        )
+
+    def forward(self, src, trg, coordinates):
+        out = self.encoder(
+            self.encoder_embedding(src, coordinates),
+        )
+        out = self.cls(out)
+        return out
+    
+
+class PyTorchTransformerDecoder(nn.Module):
+    def __init__(
+        self,
+        encoder_embedding_type,
+        src_vocab_size,
+        trg_vocab_size,
+        src_pad_idx,
+        trg_pad_idx,
+        embedding_dim=256,
+        num_layers=6,
+        forward_expansion=4,
+        heads=8,
+        dropout=0,
+        device="cuda",
+        max_length=100
+    ):
+        super(PyTorchTransformerDecoder, self).__init__()
+        self.device = device
+        
+        # Layers
+        self.encoder_embedding = EmbeddingType.embedding_layer(encoder_embedding_type)(
+            vocab_size=src_vocab_size,
+            embedding_dim=embedding_dim,
+            dropout_prob=dropout,
+            max_length=max_length,
+            device=device            
+        )
+        self.decoder_layer = nn.TransformerDecoderLayer(
+            d_model=embedding_dim,
+            nhead=heads
+        )
+        self.decoder_embedding = nn.Embedding(
+            trg_vocab_size,
+            embedding_dim
+        )
+        self.decoder = nn.TransformerDecoder(
+            decoder_layer=self.decoder_layer,
+            num_layers=num_layers
+        )
+        self.cls = Classifier(
+            trg_vocab_size=trg_vocab_size,
+            embedding_dim=embedding_dim,
+            softmax_dim=2
+        )
+
+    def forward(self, src, trg, coordinates):
+        out = self.decoder(
+            self.decoder_embedding(trg),
+            self.encoder_embedding(src, coordinates),
+        )
+        out = self.cls(out)
+        return out

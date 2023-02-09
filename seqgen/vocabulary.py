@@ -1,11 +1,12 @@
 import pickle
 import os.path
+from pathlib import Path
 
 
 class Vocabulary(object):
     def __init__(self,
                  vocab_filename,
-                 vocab_file='./vocab.pkl',
+                 vocab_file=None,
                  start_word="<start>",
                  end_word="<end>",
                  unk_word="<unk>",
@@ -20,7 +21,11 @@ class Vocabulary(object):
           vocab_from_file: If False, create vocab from scratch & override any existing vocab_file
                            If True, load vocab from from existing vocab_file, if it exists
         """
-        self.vocab_file = vocab_file
+        if vocab_file is not None:
+            self.vocab_file = vocab_file
+        else:
+            p = Path(vocab_filename)
+            self.vocab_file = p.stem
         self.start_word = start_word
         self.end_word = end_word
         self.unk_word = unk_word
