@@ -102,13 +102,16 @@ def generate_random_sequence(in_voc: list, out_voc: list, continue_prob=0.9, max
         # Check if the sequence should be continued
         if r.random() > continue_prob or len(seq_in) >= (max_length - 1) or len(seq_out) >= (max_length - 1):
             break
+            
+    seq_in.append(['<end>', 0, 0, 0, 0])
+    seq_out.append('<end>')
 
     # Pad sequence with zeros
     if padding:
         for i in range(max_length - len(seq_in)):
-            seq_in.append(['<end>', 0, 0, 0, 0])
+            seq_in.append(['<unk>', 0, 0, 0, 0])
         for i in range(max_length - len(seq_out)):
-            seq_out.append('<end>')
+            seq_out.append('<unk>')
             
     # Randomly swap positions
     for i in range(swap_times):

@@ -30,11 +30,11 @@ class SyntheticSequenceDataset(Dataset):
         if self.additional_eos:
             input_seqs = torch.cat([
                 input_seqs,
-                torch.ones(input_seqs.size(0), 1).to(self.device)
+                (torch.ones(input_seqs.size(0), 1)*2).to(self.device)
             ], dim=1).to(torch.int64)
             target_seqs = torch.cat([
                 target_seqs,
-                torch.ones(target_seqs.size(0), 1).to(self.device)
+                (torch.ones(target_seqs.size(0), 1)*2).to(self.device)
             ], dim=1).to(torch.int64)
             coordinates = torch.cat([
                 coordinates,
