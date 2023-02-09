@@ -9,8 +9,8 @@ from seqgen.preprocess import *
 digits_in = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 digits_out = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
-letters_in = string.ascii_uppercase + string.ascii_lowercase
-letters_out = string.ascii_uppercase + string.ascii_lowercase
+letters_in = list(string.ascii_uppercase + string.ascii_lowercase)
+letters_out = list(string.ascii_uppercase + string.ascii_lowercase)
 
 operators_in = ["op_plus", "op_minus", "op_multiply", "op_divide"]
 operators_out = ["+", "-", "\cdot", "/"]
@@ -179,8 +179,8 @@ def generator(num_samples=5, max_length=10, continue_prob=0.95, swap_prob=0.5, s
     inputs, outputs = [], []
     for i in range(num_samples):
         feature_seq, target_seq = generate_random_sequence(
-            in_voc=digits_in+operators_in,
-            out_voc=digits_out+operators_out,
+            in_voc=digits_in+letters_in+operators_in,
+            out_voc=digits_out+letters_out+operators_out,
             continue_prob=continue_prob,
             max_length=max_length,
             swap_prob=swap_prob,
