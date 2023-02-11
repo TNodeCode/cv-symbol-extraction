@@ -12,8 +12,8 @@ digits_out = ["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 letters_in = list(string.ascii_uppercase + string.ascii_lowercase)
 letters_out = list(string.ascii_uppercase + string.ascii_lowercase)
 
-operators_in = ["op_plus", "op_minus", "op_multiply", "op_divide"]
-operators_out = ["+", "-", "\cdot", "/"]
+operators_in = ["+", "-", "\\times", "/"]
+operators_out = ["+", "-", "\\times", "/"]
 
 tmpl_in = ["sum", "LETTER", "=", "DIGIT", "LETTER"]
 tmpl_out = ["\\sum", "\\limits", "_",
