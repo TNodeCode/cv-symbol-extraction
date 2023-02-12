@@ -35,13 +35,14 @@ class RecurrentEncoder(torch.nn.Module):
         self.pos_encoding = pos_encoding
 
         ### Layers ###
-        self.embedding = EmbeddingType.embedding_layer(embedding_type)(
-            vocab_size=vocab_size,
-            embedding_dim=embedding_dim,
-            dropout_prob=dropout,
-            max_length=max_length,
-            device=device            
-        )
+        if embedding_type != EmbeddingType.NONE:
+            self.embedding = EmbeddingType.embedding_layer(embedding_type)(
+                vocab_size=vocab_size,
+                embedding_dim=embedding_dim,
+                dropout_prob=dropout,
+                max_length=max_length,
+                device=device            
+            )
         self.rnn = CellType.rnn_layer(cell_type)(
             embedding_dim,
             hidden_size,
@@ -52,10 +53,13 @@ class RecurrentEncoder(torch.nn.Module):
         )
 
     def forward(self, x, coordinates, hidden):
-        # First run the input sequences through an embedding layer
-        embedded = self.embedding(x=x, coordinates=coordinates)
-        # Now we need to run the embeddings through the LSTM layer
-        output, hidden = self.rnn(embedded, hidden)
+        if self.embedding_type != EmbeddingType.NONE:
+            # First run the input sequences through an embedding layer
+            embedded = self.embedding(x=x, coordinates=coordinates)
+            # Now we need to run the embeddings through the LSTM layer
+            output, hidden = self.rnn(embedded, hidden)
+        else:
+            output, hidden = self.rnn(x.unsqueeze(1), hidden)
         return output, hidden
 
     def initHidden(self, batch_size, device='cpu'):

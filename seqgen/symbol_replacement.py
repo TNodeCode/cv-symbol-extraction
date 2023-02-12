@@ -13,11 +13,11 @@ letters_out = np.array(list(string.ascii_uppercase + string.ascii_lowercase))
 greek_in = np.array(["\\alpha", "\\beta", "\\gamma", "\\Delta", "\mu", "\\theta", "\\pi", "\\lambda", "\\sigma", "\\phi"])
 greek_out = np.array(["\\alpha", "\\beta", "\\gamma", "\\Delta", "\mu", "\\theta", "\\pi", "\\lambda", "\\sigma", "\\phi"])
 
-operators_in = np.array(["+", "-", "/", "\\times", "=", "\\leq", "\\geq", "\\gt", "\\pm", "\\forall", "\\in", "\\lt", "\\exists", "\\neq"])
-operators_out = np.array(["+", "-", "/", "\\times", "=", "\\leq", "\\geq", "\\gt", "\\pm", "\\forall", "\\in", "\\lt", "\\exists", "\\neq"])
+operators_in = np.array(["+", "/", "\\times", "=", "\\leq", "\\geq", "\\gt", "\\pm", "\\forall", "\\in", "\\lt", "\\exists", "\\neq"])
+operators_out = np.array(["+", "/", "\\times", "=", "\\leq", "\\geq", "\\gt", "\\pm", "\\forall", "\\in", "\\lt", "\\exists", "\\neq"])
 
-functions_in = np.array(["\\sin", "\\cos", "\\sqrt", "\\log"])
-functions_out = np.array(["\\sin", "\\cos", "\\sqrt", "\\log"])
+functions_in = np.array(["\\sin", "\\cos", "\\log"])
+functions_out = np.array(["\\sin", "\\cos", "\\log"])
 
 symbols_with_limits_in = np.array(["\\sum", "\\int", "\\lim"])
 symbols_with_limits_out = np.array(["\\sum", "\\int", "\\lim"])

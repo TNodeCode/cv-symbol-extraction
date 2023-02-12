@@ -182,8 +182,8 @@ def generator(num_samples=5, max_length=10, continue_prob=0.95, swap_prob=0.5, s
     inputs, outputs = [], []
     for i in range(num_samples):
         feature_seq, target_seq = generate_random_sequence(
-            in_voc=digits_in+letters_in+operators_in,
-            out_voc=digits_out+letters_out+operators_out,
+            in_voc=digits_in+letters_in,
+            out_voc=digits_out+letters_out,
             continue_prob=continue_prob,
             max_length=max_length,
             swap_prob=swap_prob,

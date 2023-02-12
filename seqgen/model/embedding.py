@@ -17,6 +17,7 @@ def get_sincos_position_encoding(max_length, embedding_dim, n=10000, device='cpu
 
     
 class EmbeddingType:
+    NONE="none"
     COORDS_DIRECT = "coords_direct"
     COORDS_RESIDUAL = "coords_residual"
     POS_TRIGENC = "pos_trigenc"
@@ -216,3 +217,71 @@ class PositionSubspaceEmbedding(nn.Module):
         embedded_pos = self.dropout(self.pos_embedding(pos))
         # Concatenate word embeddings with position embeddings
         return torch.cat([embedded_word, embedded_pos], dim=2)
+    
+    
+class PatchEmbed(nn.Module):
+    """
+    Image patch embedding module
+    """
+    def __init__(self, img_size, channels=1, patch_size=4, embed_dim=96, norm_layer=None, device='cpu', **kwargs):
+        """
+        Create image to patch embedding module.
+
+        Parameters:
+            - img_size (int): Image size.
+            - channels (int) [1]: Number of input channels.
+            - patch_size (int) [4]: Patch token size.
+            - embed_dim (int) [96]: Size of embedding vectors.
+            - norm_layer (nn.Module|None) [None]: Normalization layer.
+
+        """
+        super().__init__()
+        ############################################################
+        ###                  START OF YOUR CODE                  ###
+        ############################################################
+
+        # Hyperparameters
+        self.img_size = img_size
+        self.channels = channels
+        self.patch_size = patch_size
+        self.embed_dim = embed_dim
+        self.norm_layer = norm_layer
+        self.device = device
+        
+        # Layers
+        self.embedding = nn.Linear(patch_size*patch_size, embed_dim)
+
+        ############################################################
+        ###                   END OF YOUR CODE                   ###
+        ############################################################
+
+    def forward(self, x):
+        """
+        Create patch embeddings from input images.
+
+        Parameters:
+            - x (torch.Tensor): (batch_size, [channels,] height, width).
+
+        Returns:
+            - x (torch.Tensor): (batch_size, num_patches, embed_dim).
+
+        """
+        # If there is no explicit dimension for the channel then add one
+        if (len(x.shape) == 3):
+            x = x.unsqueeze(dim=1)
+            
+        # Extrakt shape informtion
+        batch_size, channels, height, width = x.shape
+        
+        # Split images into patches (patches will be of shape (batch_size,n_patches,channels,patch_size^2)
+        # Each list items contains the same region of each image in the batch
+        size = self.patch_size # patch size
+        n_patches = (self.img_size // self.patch_size)**2 * self.channels
+        patches = x.unfold(2, size, size).unfold(3, size, size).reshape(batch_size, n_patches, size*size)
+        
+        # Embed each patch (result will be of shape (batch_size,n_patches,channels,embed_dim))
+        embeddings = self.embedding(patches)
+        
+        if self.norm_layer:
+            embeddings = self.norm_layer(embeddings)
+        return embeddings
