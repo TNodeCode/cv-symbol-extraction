@@ -122,7 +122,7 @@ class ConcatAttention(torch.nn.Module):
         
         # Layers
         self.Wa = torch.nn.Linear(energy_input_dim, energy_input_dim)
-        self.va = torch.nn.Parameter(torch.FloatTensor(batch_size, 2*self.bi_factor* hidden_size))
+        self.va = torch.nn.Parameter(torch.randn(batch_size, 2*self.bi_factor* hidden_size))
         self.softmax = torch.nn.Softmax(dim=1)
         
     def forward(self, hidden, annotations, logging=False):
