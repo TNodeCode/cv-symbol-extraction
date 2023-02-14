@@ -1,6 +1,8 @@
 import yaml
 import torch
 from pathlib import Path
+from torchmetrics import JaccardIndex
+import numpy as np
 
 
 def overlap(boxes1, boxes2):
@@ -59,13 +61,31 @@ def convertYoloToSingleFormula(txt_file_name):
         formulaLabels_path.mkdir(parents=True)
 
     yolo_labels = [file for file in yolo_labels_path.glob("*.txt") if file.stem == txt_file_name[:-4]]
-
     output_counter = 0
     for file in yolo_labels:
         labels = open(file, "r").readlines()
         labels = list(map(lambda x: torch.Tensor(
             list(map(float, x.strip('\n').split(" ")))), labels))
         formulas_in_image = [box for box in labels if box[0] == fomrula_code]
+        if len(formulas_in_image) == 2:
+            first = formulas_in_image[0][1:]
+            second = formulas_in_image[1][1:]
+            # convert first and second to numpy arrays and to cpu
+            first = first.cpu().numpy()
+            second = second.cpu().numpy()
+            intersection = np.logical_and(first, second)
+
+            union = np.logical_or(first, second)
+
+            iou_score = np.sum(intersection) / np.sum(union)
+
+            # if iou_score > 0.95, then delete the box thats inside the other
+            if iou_score > 0.95:
+                if formulas_in_image[0][2] > formulas_in_image[1][2]:
+                    formulas_in_image.pop(1)
+                else:
+                    formulas_in_image.pop(0)
+
 
         boxes2 = torch.stack(labels)[:, 1:]
         boxes2 = coordinatesConverter(boxes2, 640, 640)

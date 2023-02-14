@@ -28,7 +28,7 @@ if uploaded_image is not None:
 
     # resize image to 640x640 with cv2
     img = cv2.imread('image.jpg')
-    img = cv2.resize(img, (640, 640))
+    #img = cv2.resize(img, (640, 640))
 
     # make chalk lines better
     #kernel = np.ones((5, 5), np.uint8)
@@ -52,7 +52,7 @@ if uploaded_image is not None:
     print(img[:-4])
     txt_files = [file for file in Path('detections' + os.sep + 'formulaLabels' + os.sep + img[:-4]).glob("*.txt")]
     print(len(txt_files))
-
+    st.markdown("### Step 2: Generate LaTeX formula with Seq2Seq model")
     for txt_file in txt_files:
         input_seq_other = []
         coordinates_other = []
@@ -77,8 +77,9 @@ if uploaded_image is not None:
             coordinates.append(l)
         # transform input_seq to tensor
         counter = 0
-        while len(input_seq) < 50:
-            input_seq.append(1)
+        input_seq.append(1)
+        while len(input_seq) < 25:
+            input_seq.append(2)
             counter += 1
 
         input_seq_other.append(input_seq)
@@ -97,21 +98,17 @@ if uploaded_image is not None:
         coordinates = np.array(normalize_coordinates(np.array([coordinates]), contains_class=False)).squeeze()
         coordinates = coordinates.tolist()
         coordinates_other.append(coordinates)
-        coords_end = torch.Tensor([[0.0, 0.0, 0.0, 0.0] for i in range(counter)])
+        coords_end = torch.Tensor([[0.0, 0.0, 0.0, 0.0] for i in range(counter+1)])
         coordinates_other = torch.tensor(coordinates_other)
         # add coords_end to coordinates_other
-        print(coords_end.shape)
-        print(coordinates_other.shape)
         coords_end = coords_end.unsqueeze(0)
-        print(coords_end.shape)
         coordinates = torch.cat((coordinates_other, coords_end), dim=1)
-        print(coordinates.shape)
         print("IN", input_seq.shape, "COORDS", coordinates.shape)
         prediction = predict_sequentially(
             input_seqs=input_seq, coordinates=coordinates)
         prediction = list(prediction)
-
-        st.markdown("### Step 2: Generate LaTeX formula with Seq2Seq model")
+        # remove all "<end>" and "<start>" and "<unk>" tokens
+        prediction = [x for x in prediction if x != "<end>" and x != "<start>" and x != "<unk>"]
         generated_formula = "a^2+b^2=c^2"
         st.write("This is the formula the model has generated")
         st.write("Raw LaTeX formula")

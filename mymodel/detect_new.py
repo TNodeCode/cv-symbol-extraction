@@ -20,7 +20,7 @@ def detect(weights, source, imgsz, conf_thres=0.25, iou_thres=0.45):
     save_conf = False
     nosave = False
     classes = None
-    agnostic_nms = False
+    agnostic_nms = True
     augment = False
     update = False
     project = 'runs/detect'

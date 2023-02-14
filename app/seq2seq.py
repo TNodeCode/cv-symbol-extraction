@@ -8,11 +8,11 @@ if torch.cuda.device_count():
 else:
     device = "cpu"
 
-num_layers = 2
-embedding_dim = 128
+num_layers = 3
+embedding_dim = 256
 batch_size = 2
-max_length = 50
-heads = 8
+max_length = 25
+heads = 32
 dropout = 0
 
 vocab_in = Vocabulary(vocab_filename="seqgen/vocab_in.txt")
@@ -27,12 +27,12 @@ model = transformer.Transformer(
     num_layers=num_layers,
     heads=heads,
     dropout=dropout,
-    src_pad_idx=1e10,
-    trg_pad_idx=1e10,
+    src_pad_idx=2,
+    trg_pad_idx=2,
     device=device
 ).to(device)
 
-checkpoint_file = "transformer_realdata2.pt"
+checkpoint_file = "transformer_3layers_256emb_32head_25len.pt"
 checkpoint = torch.load(checkpoint_file, map_location=device)
 model.load_state_dict(checkpoint['model_state_dict'])
 print("MODEL LOADED")
