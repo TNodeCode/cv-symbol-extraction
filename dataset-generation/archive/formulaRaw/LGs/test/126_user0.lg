@@ -1,0 +1,118 @@
+# IUD, 126_user0
+# Objects(24):
+# Object: 2_1 . 
+N, 31, 2, 1.0
+# Object: n_3 . 
+N, 16, n, 1.0
+# Object: n_1 . 
+N, 5, n, 1.0
+# Object: 1_1 . 
+N, 24, 1, 1.0
+# Object: n_4 . 
+N, 19, n, 1.0
+# Object: x_1 . 
+N, 0, x, 1.0
+N, 1, x, 1.0
+E, 0, 1, x, 1.0
+E, 1, 0, x, 1.0
+# Object: le_1 . 
+N, 12, \leq, 1.0
+N, 13, \leq, 1.0
+E, 12, 13, \leq, 1.0
+E, 13, 12, \leq, 1.0
+# Object: +_1 . 
+N, 20, +, 1.0
+N, 21, +, 1.0
+E, 20, 21, +, 1.0
+E, 21, 20, +, 1.0
+# Object: 1_2 . 
+N, 22, 1, 1.0
+# Object: q_3 . 
+N, 17, q, 1.0
+N, 18, q, 1.0
+E, 17, 18, q, 1.0
+E, 18, 17, q, 1.0
+# Object: p_1 . 
+N, 3, p, 1.0
+N, 4, p, 1.0
+E, 3, 4, p, 1.0
+E, 4, 3, p, 1.0
+# Object: n_2 . 
+N, 9, n, 1.0
+# Object: n_5 . 
+N, 30, n, 1.0
+# Object: _2 . 
+N, 23, -, 1.0
+# Object: _3 . 
+N, 27, -, 1.0
+# Object: q_4 . 
+N, 28, q, 1.0
+N, 29, q, 1.0
+E, 28, 29, q, 1.0
+E, 29, 28, q, 1.0
+# Object: q_2 . 
+N, 14, q, 1.0
+N, 15, q, 1.0
+E, 14, 15, q, 1.0
+E, 15, 14, q, 1.0
+# Object: q_1 . 
+N, 7, q, 1.0
+N, 8, q, 1.0
+E, 7, 8, q, 1.0
+E, 8, 7, q, 1.0
+# Object: |_2 . 
+N, 11, |, 1.0
+# Object: <_1 . 
+N, 25, \lt, 1.0
+# Object: -_1 . 
+N, 2, -, 1.0
+# Object: 1_3 . 
+N, 26, 1, 1.0
+# Object: |_1 . 
+N, 10, |, 1.0
+# Object: _1 . 
+N, 6, -, 1.0
+
+# Relations from SRT:
+E, 0, 2, Right, 1.0
+E, 1, 2, Right, 1.0
+E, 2, 6, Right, 1.0
+E, 3, 5, Sub, 1.0
+E, 4, 5, Sub, 1.0
+E, 6, 3, Above, 1.0
+E, 6, 4, Above, 1.0
+E, 6, 7, Below, 1.0
+E, 6, 8, Below, 1.0
+E, 6, 11, Right, 1.0
+E, 7, 9, Sub, 1.0
+E, 8, 9, Sub, 1.0
+E, 10, 0, Right, 1.0
+E, 10, 1, Right, 1.0
+E, 11, 12, Right, 1.0
+E, 11, 13, Right, 1.0
+E, 12, 23, Right, 1.0
+E, 13, 23, Right, 1.0
+E, 14, 16, Sub, 1.0
+E, 14, 17, Right, 1.0
+E, 14, 18, Right, 1.0
+E, 15, 16, Sub, 1.0
+E, 15, 17, Right, 1.0
+E, 15, 18, Right, 1.0
+E, 17, 19, Sub, 1.0
+E, 18, 19, Sub, 1.0
+E, 19, 20, Right, 1.0
+E, 19, 21, Right, 1.0
+E, 20, 22, Right, 1.0
+E, 21, 22, Right, 1.0
+E, 23, 14, Below, 1.0
+E, 23, 15, Below, 1.0
+E, 23, 24, Above, 1.0
+E, 23, 25, Right, 1.0
+E, 25, 27, Right, 1.0
+E, 27, 26, Above, 1.0
+E, 27, 28, Below, 1.0
+E, 27, 29, Below, 1.0
+E, 28, 30, Sub, 1.0
+E, 28, 31, Sup, 1.0
+E, 29, 30, Sub, 1.0
+E, 29, 31, Sup, 1.0

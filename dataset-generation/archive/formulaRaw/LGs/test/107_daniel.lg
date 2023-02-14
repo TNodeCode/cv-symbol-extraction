@@ -1,0 +1,72 @@
+# IUD, 107_daniel
+# Objects(18):
+# Object: )_1 . 
+N, 13, ), 1.0
+# Object: b_3 . 
+N, 17, b, 1.0
+# Object: 2_2 . 
+N, 4, 2, 1.0
+# Object: a_3 . 
+N, 15, a, 1.0
+# Object: (_1 . 
+N, 7, (, 1.0
+# Object: a_1 . 
+N, 0, a, 1.0
+# Object: +_1 . 
+N, 2, +, 1.0
+# Object: (_2 . 
+N, 14, (, 1.0
+# Object: a_2 . 
+N, 8, a, 1.0
+# Object: b_2 . 
+N, 10, b, 1.0
+# Object: +_2 . 
+N, 9, +, 1.0
+# Object: =_1 . 
+N, 5, =, 1.0
+N, 6, =, 1.0
+E, 5, 6, =, 1.0
+E, 6, 5, =, 1.0
+# Object: )_2 . 
+N, 20, ), 1.0
+# Object: -_1 . 
+N, 16, -, 1.0
+# Object: i_2 . 
+N, 18, i, 1.0
+N, 19, i, 1.0
+E, 18, 19, i, 1.0
+E, 19, 18, i, 1.0
+# Object: 2_1 . 
+N, 1, 2, 1.0
+# Object: i_1 . 
+N, 11, i, 1.0
+N, 12, i, 1.0
+E, 11, 12, i, 1.0
+E, 12, 11, i, 1.0
+# Object: b_1 . 
+N, 3, b, 1.0
+
+# Relations from SRT:
+E, 0, 1, Sup, 1.0
+E, 0, 2, Right, 1.0
+E, 2, 3, Right, 1.0
+E, 3, 4, Sup, 1.0
+E, 3, 5, Right, 1.0
+E, 3, 6, Right, 1.0
+E, 5, 7, Right, 1.0
+E, 6, 7, Right, 1.0
+E, 7, 8, Right, 1.0
+E, 8, 9, Right, 1.0
+E, 9, 10, Right, 1.0
+E, 10, 11, Right, 1.0
+E, 10, 12, Right, 1.0
+E, 11, 13, Right, 1.0
+E, 12, 13, Right, 1.0
+E, 13, 14, Right, 1.0
+E, 14, 15, Right, 1.0
+E, 15, 16, Right, 1.0
+E, 16, 17, Right, 1.0
+E, 17, 18, Right, 1.0
+E, 17, 19, Right, 1.0
+E, 18, 20, Right, 1.0
+E, 19, 20, Right, 1.0
